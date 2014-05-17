@@ -1,6 +1,7 @@
 
 package com.fishuyo.seer
 package kodama
+package hallway
 
 import graphics._
 import io._
@@ -8,15 +9,12 @@ import dynamic._
 
 object Main extends SeerApp {
 
-  val live = new SeerScriptLoader("live.scala")
+  val live = new SeerScriptLoader("scripts/hallway.scala")
 
 
   override def init(){
   	loadShaders()
 
-  	val rdNode = new RDNode
-  	SceneGraph.roots += rdNode
-  	rdNode.outputTo(ScreenNode)
   }
 
   override def draw(){}

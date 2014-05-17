@@ -6,9 +6,9 @@ import Keys._
 object TemplateBuild extends Build {
 
   lazy val project = SeerProject(
-  	id = "template_project",
+  	id = "kodama",
   	base = file("."),
   	settings = BuildSettings.app
-  ) dependsOn( SeerBuild.seer_desktop, SeerBuild.seer_multitouch, SeerBuild.seer_eval )
+  ) dependsOn( SeerBuild.seer_desktop, SeerBuild.seer_multitouch, SeerBuild.seer_eval, SeerBuild.seer_kinect )
   
 }
