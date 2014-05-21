@@ -7,7 +7,8 @@ import com.badlogic.gdx.graphics.GL20
 
 class RDNode extends RenderNode {
 	var isTarget2 = true
-	var buffer2:Option[FrameBuffer] = None
+	var buffer1:Option[FloatFrameBuffer] = None
+	var buffer2:Option[FloatFrameBuffer] = None
 
 	shader = "rd"
 
@@ -16,13 +17,13 @@ class RDNode extends RenderNode {
 	scene.push(Plane())
 
 	override def createBuffer(){
-    if(buffer.isEmpty){ 
-    	buffer = Some(FrameBuffer(viewport.w.toInt, viewport.h.toInt))
-    	buffer2 = Some(FrameBuffer(viewport.w.toInt, viewport.h.toInt))
+    if(buffer1.isEmpty){ 
+    	buffer1 = Some(new FloatFrameBuffer(viewport.w.toInt, viewport.h.toInt))
+    	buffer2 = Some(new FloatFrameBuffer(viewport.w.toInt, viewport.h.toInt))
     }
 	}
 	override def bindBuffer(i:Int) = {
-		if( isTarget2 ) buffer.get.getColorBufferTexture().bind(i)
+		if( isTarget2 ) buffer1.get.getColorBufferTexture().bind(i)
 		else buffer2.get.getColorBufferTexture().bind(i)
 	}
 	override def resize(vp:Viewport){
@@ -34,19 +35,19 @@ class RDNode extends RenderNode {
       // camera.viewportHeight = vp.h
     }
 
-    if(buffer.isDefined){
-      buffer.get.dispose
-      buffer = Some(FrameBuffer(vp.w.toInt,vp.h.toInt))
+    if(buffer1.isDefined){
+      buffer1.get.dispose
+      buffer1 = Some(new FloatFrameBuffer(vp.w.toInt,vp.h.toInt))
       buffer2.get.dispose
-      buffer2 = Some(FrameBuffer(vp.w.toInt,vp.h.toInt))
+      buffer2 = Some(new FloatFrameBuffer(vp.w.toInt,vp.h.toInt))
     }
   }
 
   override def bindTarget(){
-    if( buffer.isDefined ){
+    if( buffer1.isDefined ){
       
       if(isTarget2) buffer2.get.begin()
-      else buffer.get.begin()
+      else buffer1.get.begin()
 
       if( clear ) Gdx.gl.glClear( GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT)
       else Gdx.gl.glClear( GL20.GL_DEPTH_BUFFER_BIT)
@@ -56,7 +57,7 @@ class RDNode extends RenderNode {
   }
   override def unbindTarget(){
   	if(isTarget2) buffer2.get.end()
-    else buffer.get.end()
+    else buffer1.get.end()
     isTarget2 = !isTarget2
   }
 
