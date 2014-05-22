@@ -61,8 +61,8 @@ void main(){
     // float F = 0.026; //brains
     // float K = 0.055;
 
-    // float F = 0.082; //worms
-    // float K = 0.061;
+    float F = 0.082; //worms
+    float K = 0.061;
 
     // float F = 0.082; //worm channels
     // float K = 0.059;
@@ -71,8 +71,8 @@ void main(){
     // float K = 0.061;
 
 
-    float F = v_uv.y * 0.083;
-    float K = v_uv.x * 0.073;
+    // float F = v_uv.y * 0.083;
+    // float K = v_uv.x * 0.073;
 
     vec2 alpha = vec2(da/(dx*dx), db/(dy*dy));
     alpha = vec2(0.2097, 0.105);

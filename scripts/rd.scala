@@ -58,12 +58,15 @@ object Script extends SeerScript {
 	Mouse.clear
 	Mouse.use
 
+  var rdNode:RDNode = null
+  var inited = false
+
   val s = Plane()
   s.material = Material.basic
   s.material.textureMix = 1.f
   s.shader = "colorize"
 
-  val gmesh = Plane.generateMesh(10,10,250,250,Quat.up)
+  val gmesh = Plane.generateMesh(10,10,200,200,Quat.up)
   val g = Model(gmesh).translate(0,-5,0)
   g.material = Material.basic
   g.material.textureMix = 0.f
@@ -76,16 +79,25 @@ object Script extends SeerScript {
   	a
   }
 
+  override def init(){
+  	loadShaders()
+    rdNode = new RDNode
+    // rdNode.camera = Camera //weirdness
+  	SceneGraph.roots += rdNode
+  	inited = true
+  }
+
 	override def draw(){
 		FPS.print
-		// SceneGraph.roots.last.bindBuffer(0)
+		// rdNode.bindBuffer(0)
 		s.draw
 		g.draw
 		agents.foreach(_.draw)
-		for(i <- 0 until 10) SceneGraph.roots.last.render
+		for(i <- 0 until 10) rdNode.render
 
 	}
 	override def animate(dt:Float){
+		if(!inited) init()
 
 		Shader("rd")
 		var s = Shader.shader.get
@@ -118,6 +130,17 @@ object Script extends SeerScript {
 
 
 	}
+
+	def loadShaders(){
+  	Shader.load("test", File("shaders/basic.vert"), File("shaders/basic.frag")).monitor
+    Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd.frag")).monitor
+    Shader.load("terrain", File("shaders/terrain.vert"), File("shaders/terrain.frag")).monitor
+  	Shader.load("colorize", File("shaders/basic.vert"), File("shaders/colorize.frag")).monitor
+  }
+
+  override def onUnload(){
+  	SceneGraph.roots -= rdNode
+  }
 
 }
 

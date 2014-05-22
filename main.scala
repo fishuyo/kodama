@@ -8,7 +8,7 @@ import dynamic._
 
 object Main extends SeerApp {
 
-  val live = new SeerScriptLoader("live.scala")
+  val live = new SeerScriptLoader("scripts/rd.scala")
   var rdNode:RDNode = null
 
   override def init(){
