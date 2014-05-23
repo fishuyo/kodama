@@ -151,6 +151,70 @@ Trackpad.bind( (i,f) => {
 })
 
 
+// object SaveTheTrees {
+// 	def save(name:String){
+// 		var project = "tree-" + (new java.util.Date()).toLocaleString().replace(' ','-').replace(':','-')
+//     if( name != "") project = name
+//     var path = "TreeData/" + project
+//     var file = Gdx.files.internal(path).file()
+//     file.mkdirs()
+
+//   	var map = Map[String,Any]()
+//     map = map + (("loop"+i) -> List(b.curSize,b.rPos,b.wPos,b.rMin,b.rMax,b.speed,l.gain,l.pan,l.decay))
+
+//     file = Gdx.files.external(path+"/loops.json").file()
+//   	val p = new java.io.PrintWriter(file)
+// 	  p.write( scala.util.parsing.json.JSONObject(map).toString( (o) =>{
+// 	  	o match {
+// 	  		case o:List[Any] => s"""[${o.mkString(",")}]"""
+// 	  		case s:String => s"""${'"'}${s}${'"'}"""
+// 	  		case a:Any => a.toString()  
+// 	  	}
+// 	  }))
+// 	  p.close
+
+// 	}
+
+// 	def load(name:String){
+//     val path = "LoopData/" + name
+//     val file = Gdx.files.external(path+"/loops.json").file()
+
+//     val sfile = scala.io.Source.fromFile(file)
+//   	val json_string = sfile.getLines.mkString
+//   	sfile.close
+
+//   	val parsed = scala.util.parsing.json.JSON.parseFull(json_string)
+//   	if( parsed.isEmpty ){
+//   		println(s"failed to parse: $path")
+//   		return
+//   	}
+
+//   	val map = parsed.get.asInstanceOf[Map[String,Any]]
+
+//     for( i <- (0 until loops.size)){
+//     	loops(i).load(path+"/"+i+".wav")
+
+// 	  	val l = map("loop"+i).asInstanceOf[List[Double]]
+// 	  	// println(l)
+// 	  	val loop = loops(i)
+// 	  	val b = loop.b
+
+// 	  	b.curSize = l(0).toInt
+// 	  	b.maxSize = b.curSize
+// 	  	b.rPos = l(1).toFloat
+// 	  	b.wPos = l(2).toInt
+// 	  	b.rMin = l(3).toInt
+// 	  	b.rMax = l(4).toInt
+// 	  	b.speed = l(5).toFloat
+// 	  	loop.gain = l(6).toFloat
+// 	  	loop.pan = l(7).toFloat
+// 	  	loop.decay = l(8).toFloat
+
+//     }
+// 	}
+// }
+
+
 
 
 

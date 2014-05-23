@@ -44,7 +44,7 @@ class Agent extends Animatable {
 	}
 	override def animate(dt:Float){
 		nav.step(dt)
-		nav.pos.wrap(Vec3(-1,-1,-1),Vec3(1,1,1))
+		nav.pos.wrap(Vec3(-1,-1,-.05),Vec3(1,1,.05))
 		if(math.abs(nav.pos.z) < 0.01){
 			Shader("rd")
 			var s = Shader.shader.get
@@ -66,13 +66,13 @@ object Script extends SeerScript {
   s.material.textureMix = 1.f
   s.shader = "colorize"
 
-  val gmesh = Plane.generateMesh(10,10,200,200,Quat.up)
-  val g = Model(gmesh).translate(0,-5,0)
-  g.material = Material.basic
-  g.material.textureMix = 0.f
-  g.shader = "terrain"
+  // val gmesh = Plane.generateMesh(10,10,200,200,Quat.up)
+  // val g = Model(gmesh).translate(0,-5,0)
+  // g.material = Material.basic
+  // g.material.textureMix = 0.f
+  // g.shader = "terrain"
 
-  val agents = for(i <- 0 until 100) yield {
+  val agents = for(i <- 0 until 4) yield {
   	val a = new Agent
   	a.nav.vel = Vec3(0,0,.1)
   	a.nav.angVel = Random.vec3()
@@ -91,7 +91,7 @@ object Script extends SeerScript {
 		FPS.print
 		// rdNode.bindBuffer(0)
 		s.draw
-		g.draw
+		// g.draw
 		agents.foreach(_.draw)
 		for(i <- 0 until 10) rdNode.render
 
