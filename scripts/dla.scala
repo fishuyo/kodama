@@ -46,7 +46,7 @@ class Agent extends Animatable {
 		nav.step(dt)
 		nav.pos.wrap(Vec3(-1,-1,-.05),Vec3(1,1,.05))
 		if(math.abs(nav.pos.z) < 0.01){
-			Shader("rd")
+			Shader("dla")
 			var s = Shader.shader.get
 			s.uniforms("brush") = (nav.pos.xy+Vec2(1,1))*0.5
 		}
@@ -82,6 +82,7 @@ object Script extends SeerScript {
   override def init(){
   	loadShaders()
     rdNode = new RDNode
+    rdNode.shader = "dla"
     // rdNode.camera = Camera //weirdness
   	SceneGraph.roots += rdNode
   	inited = true
@@ -99,7 +100,7 @@ object Script extends SeerScript {
 	override def animate(dt:Float){
 		if(!inited) init()
 
-		Shader("rd")
+		Shader("dla")
 		var s = Shader.shader.get
 		s.uniforms("brush") = Mouse.xy()
 		s.uniforms("width") = Window.width.toFloat
@@ -133,9 +134,9 @@ object Script extends SeerScript {
 
 	def loadShaders(){
   	Shader.load("test", File("shaders/basic.vert"), File("shaders/basic.frag")).monitor
-    Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd.frag")).monitor
+    Shader.load("dla", File("shaders/basic.vert"), File("shaders/dla.frag")).monitor
     Shader.load("terrain", File("shaders/terrain.vert"), File("shaders/terrain.frag")).monitor
-  	Shader.load("colorize", File("shaders/basic.vert"), File("shaders/colorize.frag")).monitor
+  	Shader.load("colorize", File("shaders/basic.vert"), File("shaders/colorize_dla.frag")).monitor
   }
 
   override def onUnload(){

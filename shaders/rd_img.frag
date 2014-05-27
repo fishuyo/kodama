@@ -53,14 +53,14 @@ void main(){
     // float F = 0.034; //mitosis
     // float K = 0.063;
 
-    float F = 0.025; //pulse
-    float K = 0.06;
+    // float F = 0.025; //pulse
+    // float K = 0.06;
 
     // float F = 0.014; //waves
     // float K = 0.045;
 
-    // float F = 0.026; //brains
-    // float K = 0.055;
+    float F = 0.026; //brains
+    float K = 0.055;
 
     // float F = 0.082; //worms
     // float K = 0.061;
