@@ -15,9 +15,14 @@ import com.badlogic.gdx.graphics.GL20
 import scala.collection.mutable.ListBuffer
 
 import concurrent.duration._
+import de.sciss.osc._
+
 
 Scene.alpha = .3
 SceneGraph.root.depth = false
+
+Camera.nav.pos.set(0,1,4)
+Camera.nav.quat.set(1,0,0,0)
 
 object Script extends SeerScript {
 
@@ -33,6 +38,10 @@ object Script extends SeerScript {
   model.material.color = RGB(0,0.5,0.7)
 
   val fabric = new SpringMesh(mesh,1.f)
+  fabric.pins += AbsoluteConstraint(fabric.particles(0), fabric.particles(0).position)
+  fabric.pins += AbsoluteConstraint(fabric.particles(50), fabric.particles(50).position)
+  // fabric.pins += AbsoluteConstraint(fabric.particles(0), fabric.particles(0).position)
+  fabric.pins += AbsoluteConstraint(fabric.particles.last, fabric.particles.last.position)
   Gravity.set(0,0,0)
 
   val sun = Sphere().scale(0.1f)
@@ -76,14 +85,18 @@ object Script extends SeerScript {
 		// tree.draw
 	}
 
+  override def preUnload(){
+    send.disconnect
+    recv.disconnect
+  }
 	override def onUnload(){
 	}
 
   
   override def animate(dt:Float){
   	val x = Mouse.xy().x
-  	cycle.speed = x*100
-  	cycle2.speed = x*100
+  	// cycle.speed = x*100
+  	// cycle2.speed = x*100
 
   	if( Mouse.status() == "drag"){
 			vel = (Mouse.xy() - lpos)/dt
@@ -101,14 +114,17 @@ object Script extends SeerScript {
 		}
 		lpos = Mouse.xy()
 
-		// if(dirty){
-		// 	model = Model()
-		// 	modelGenerator.buildModel(model)
-		// 	dirty = false
-		// 	model.scale(0.2).translate(0,5,0)
-		// }
+    val r = Ray(B.pos+Vec3(0,100,0), Vec3(0,-1,0) )
+    fabric.particles.foreach( (p) => {
+      val t = r.intersectSphere(p.position, 0.25f)
+      if(t.isDefined){
+        p.applyForce(Bvel*150.f)
+        cursor.pose.pos.set(r(t.get))
+      }
+    })
 
-		fabric.animate(x*2*dt)
+
+		fabric.animate(speed.abs*2.f*dt)
 		// tree.root.pose.pos.set(part.position)
 		// tree.animate(dt)
   }
@@ -133,23 +149,34 @@ object Script extends SeerScript {
   Mouse.use
 
   var B = Pose()
-  // VRPN.clear
-  // VRPN.bind("b", (p)=>{
-  //   B = B.lerp(p,0.1f)
-  //   val q = -B.quat.toZ() //toEulerVec()
-  //   // println(q)
-  //   val t = Script.tree
-  //   t.bAngle.y.setMinMax( 0.05, q.x,false )
-  //   // t.sAngle.x.setMinMax( 0.15, B.pos.x, false )
-  //   // t.bAngle.x.setMinMax( 0.15, B.pos.x, false )
-  //   // t.sAngle.z.setMinMax( 0.05, q.z, false )
-  //   // t.bAngle.z.setMinMax( 0.05, q.z, false )
+  var Blast = Pose()
+  var Bvel = Vec3()
+  var speed = 1.f
+  VRPN.clear
+  VRPN.bind("gnarl", (p)=>{
+    Blast = B
+    B = B.lerp(p,0.1f)
+    Bvel = p.pos - Blast.pos
+    //speed = B.quat.toEulerVec.y.toDegrees / 90.f
+    // speed = (B.quat.toZ dot Vec3(-1,0,0))
+    // send.send("/gnarl/speed",speed)
+    // Script.cycle.speed = speed*20
+    // Script.cycle2.speed = speed*20
 
-  //   t.sRatio.setMinMax( 0.15, B.pos.y, false )
-  //   t.bRatio.setMinMax( 0.15, B.pos.y, false )
+  })
 
-  //   t.refresh()
-  // })
+  val send = new OSCSend
+  send.connect("localhost", 8010)
+  val recv = new OSCRecv
+  recv.listen(8011)
+  recv.bindp {
+    case Message("/gnarl/speed", s:Float) => 
+      speed = s
+      Script.cycle.speed = speed*20
+      Script.cycle2.speed = speed*20
+    case _ => ()
+  }
+
 }
 
 

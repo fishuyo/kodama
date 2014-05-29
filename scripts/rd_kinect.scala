@@ -34,7 +34,7 @@ object Script extends SeerScript {
   var rdNode:RDNode = null
   var inited = false
 
-  val s = Plane().scale(1,-1,1).translate(1.5,0,0)
+  val s = Plane().scale(1920.f/512.f,-1,1).translate(2.5,0,0)
   s.material = Material.basic
   s.material.textureMix = 1.f
   s.shader = "colorize"
@@ -45,7 +45,7 @@ object Script extends SeerScript {
 	println(OpenNI.depthMD.getFullXRes)
 
 
-	val quad1 = Plane().scale(1,-480.f/640.f,1).translate(-1,0,0)
+	val quad1 = Plane().scale(1,-480.f/640.f,1).translate(-1.5,0,0)
 	val quad2 = Plane().scale(1,-480.f/640.f,1).translate(1,0,0)
   val dpix = new Pixmap(640,480, Pixmap.Format.RGB888)
   val vpix = new Pixmap(640,480, Pixmap.Format.RGB888)
