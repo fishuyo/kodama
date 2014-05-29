@@ -22,9 +22,9 @@ object Main extends SeerApp {
 
 
   def loadShaders(){
-    var s = Shader.load("test", File("shaders/basic.vert"), File("shaders/basic.frag"))
-    s.monitor
-    s = Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd.frag"))
-    s.monitor
+    // var s = Shader.load("test", File("shaders/basic.vert"), File("shaders/basic.frag"))
+    // s.monitor
+    // s = Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd.frag"))
+    // s.monitor
   }
 }

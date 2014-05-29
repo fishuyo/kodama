@@ -53,8 +53,8 @@ void main(){
     // float F = 0.034; //mitosis
     // float K = 0.063;
 
-    float F = 0.025; //pulse
-    float K = 0.06;
+    // float F = 0.025; //pulse
+    // float K = 0.06;
 
     // float F = 0.014; //waves
     // float K = 0.045;
@@ -62,8 +62,8 @@ void main(){
     // float F = 0.026; //brains
     // float K = 0.055;
 
-    // float F = 0.082; //worms
-    // float K = 0.061;
+    float F = 0.082; //worms
+    float K = 0.061;
 
     // float F = 0.082; //worm channels
     // float K = 0.059;
@@ -110,10 +110,11 @@ void main(){
     // vec2 dV = vec2( alpha.x * lapl.x - xyy + feed*(1.-uv.x), alpha.y*lapl.y + xyy - (feed+kill)*uv.y);
     // dst = uv + dt*dV;
 
+    vec4 inV = texture2D(u_texture1, v_uv);
     if(brush.x > 0.0)
     {
         vec2 brsh = brush;
-        brsh.y = 1.0 - brsh.y;
+        // brsh.y = 1.0 - brsh.y;
         vec2 diff = (v_uv - brsh)/vec2(dx,dy);
         float dist = dot(diff, diff);
         if(dist < 10.0)
