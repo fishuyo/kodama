@@ -9,10 +9,32 @@ import com.badlogic.gdx.graphics.{Texture => GdxTexture}
 import com.badlogic.gdx.graphics.Pixmap
 
 import org.openni._
-import java.nio.ShortBuffer
-import java.nio.ByteBuffer
+import java.nio._
+
+import actor._
+import akka.actor._
+import akka.event.Logging
+ 
+class SActor extends Actor with akka.actor.ActorLogging {
+  override def preStart() = {
+    log.debug("Starting")
+  }
+  override def preRestart(reason: Throwable, message: Option[Any]) {
+    log.error(reason, "Restarting due to [{}] when processing [{}]",
+      reason.getMessage, message.getOrElse(""))
+  }
+
+  def receive = {
+    case "process" => Script.updateDepth
+    case "test" => log.info("Received test")
+    case x => log.warning("Received unknown message: {}", x)
+  }
+}
+
 
 object Script extends SeerScript {
+
+  val myactor = system.actorOf(Props(new SActor), name = "aa")
 
 	// OpenNI.disconnect()
 	OpenNI.connect()
@@ -30,7 +52,9 @@ object Script extends SeerScript {
 
 	override def draw(){
 		FPS.print
-		OpenNI.updateDepth()
+    // updateDepth()
+		// OpenNI.updateDepth()
+    myactor ! "process"
 
 		if(tex1 == null){ 
 			tex1 = new GdxTexture(dpix)
@@ -50,8 +74,9 @@ object Script extends SeerScript {
 		if( tex1 != null ){ 
 		// 	tex1.draw(Kinect.depthPix,0,0)
 		//   tex2.draw(Kinect.videoPix,0,0)
+
 			val bb = dpix.getPixels
-			bb.put(OpenNI.imgbytes)
+			bb.put(this.imgbytes)
 			bb.rewind
 			tex1.draw(dpix,0,0)
 		}
@@ -62,24 +87,47 @@ object Script extends SeerScript {
 
 	val colors = RGB(1,0,0) :: RGB(0,1,0) :: RGB(0,0,1) :: RGB(1,1,0) :: RGB(0,1,1) :: RGB(1,1,1) :: List()
   val imgbytes = Array.fill(640*480*3)(255.toByte)
+  var sceneB:ByteBuffer = _
+  var depthB:ByteBuffer = _
   def updateDepth(){
   	if( OpenNI.context == null) return
     try {
-      OpenNI.context.waitNoneUpdateAll();
+      OpenNI.context.waitAndUpdateAll();
+      // OpenNI.context.waitOneUpdateAll();
 
       val depthMD = OpenNI.depthGen.getMetaData();
       val sceneMD = OpenNI.userGen.getUserPixels(0);
 
-      val scene = sceneMD.getData().createShortBuffer();
-      val depth = depthMD.getData().createShortBuffer();
-      OpenNI.calcHist(depth);
-      depth.rewind();
+      // var d = sceneMD.getData()
+      // var size = d.getXRes()*d.getYRes()*d.getBytesPerPixel()
+      // if(sceneB == null){
+      //   sceneB = ByteBuffer.allocateDirect(size)
+      //   sceneB.order(ByteOrder.LITTLE_ENDIAN)
+      // }
+      // d.copyToBuffer(sceneB,size)
+
+      // d = sceneMD.getData()
+      // size = d.getXRes()*d.getYRes()*d.getBytesPerPixel()
+      // if(depthB == null){
+      //   depthB = ByteBuffer.allocateDirect(size)
+      //   depthB.order(ByteOrder.LITTLE_ENDIAN)
+      // }
+      // d.copyToBuffer(depthB,size)
+      
+      // val scene = sceneB.asShortBuffer
+      val scene = sceneMD.getData.createShortBuffer
+      // val depth = depthB.asShortBuffer
+      val depth = depthMD.getData.createShortBuffer
+
+      // OpenNI.calcHist(depth);
+      // depth.rewind();
         
       while(depth.remaining() > 0)
       {
         val pos = depth.position();
         val pixel = depth.get();
         val user = scene.get();
+        // val user = 1
             
     		this.imgbytes(3*pos) = 0;
     		this.imgbytes(3*pos+1) = 0;
@@ -95,7 +143,7 @@ object Script extends SeerScript {
         	}
         	if (pixel != 0)
         	{
-        		val histValue = OpenNI.histogram(pixel);
+        		val histValue = pixel/1024.f //OpenNI.histogram(pixel);
         		this.imgbytes(3*pos) = (colors(c).r*histValue*255).toByte 
         		this.imgbytes(3*pos+1) = (colors(c).g*histValue*255).toByte
         		this.imgbytes(3*pos+2) = (colors(c).b*histValue*255).toByte

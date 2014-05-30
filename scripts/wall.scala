@@ -5,26 +5,26 @@ import dynamic._
 import maths._
 import spatial._
 import io._
-import cv._
-import video._
 import util._
-import kinect._
 import actor._
 
 import trees._
-// import particle._
-// import structures._
+import particle._
 
 import scala.collection.mutable.ListBuffer
-import scala.collection.JavaConversions._
 
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.Pixmap
+import com.badlogic.gdx.graphics.{Texture => GdxTexture}
 
 import akka.actor._
 import akka.event.Logging
 
-import de.sciss.osc._
+import de.sciss.osc.Message
  
+
+
+
 Shader.bg.set(0,0,0,1)
 
 var idx = 0
@@ -102,6 +102,8 @@ object SaveTheTrees {
 
 object Script extends SeerScript {
 
+  Camera.nav.pos.set(0,1,1)
+
   var dirty = true
   var update = false
 
@@ -119,26 +121,73 @@ object Script extends SeerScript {
   // tree.root.position.set(0,-2,-4)
   tree.root.pose.pos.set(0,-2,-4)
 
-	override def onLoad(){
-	}
+  var bytes:Array[Byte] = null
+  var (w,h) = (660,490)
 
-	override def draw(){
+  var pix:Pixmap = null
+  var texture:GdxTexture = null
+
+  val lquad = Plane().translate(1.,.99,0)
+  val rquad = Plane().translate(-1.,1,0)
+  lquad.material = Material.basic
+  rquad.material = Material.basic
+  lquad.material.color = RGB.black
+  rquad.material.color = RGB.black
+  lquad.material.textureMix = 1.f
+  rquad.material.textureMix = 1.f
+
+  override def onLoad(){
+  }
+
+  override def draw(){
     FPS.print
     trees.foreach(_.draw)
-	}
+    lquad.draw
+    rquad.draw
+  }
 
-	override def onUnload(){
-	}
+  override def preUnload(){
+    receiver ! akka.actor.PoisonPill
+  }
 
   
   override def animate(dt:Float){
     trees.foreach(_.animate(dt))
+
+    if( receiver == null) receiver = system.actorOf(Props(new RecvActor ), name = "puddle")
+
+    if( dirty ){  // resize everything if using sub image
+      pix = new Pixmap(w,h, Pixmap.Format.RGB888)
+      bytes = new Array[Byte](w*h*3)
+      val s1 = Vec3(1.f,-(h/w.toFloat), 1.f)
+      val s2 = Vec3(-1.f,-(h/w.toFloat), 1.f)
+      lquad.scale.set(s1)
+      rquad.scale.set(s2)
+      if(texture != null) texture.dispose
+      texture = new GdxTexture(pix)
+      lquad.material.texture = Some(texture) 
+      rquad.material.texture = Some(texture) 
+      dirty = false
+    }
+
+    if(update){
+      try{
+        val bb = pix.getPixels()
+        bb.put(bytes)
+        bb.rewind()
+      } catch { case e:Exception => "Error updating: probably size mismatch!"}
+
+      // update texture from pixmap
+      texture.draw(pix,0,0)
+      update = false
+      receiver ! "free"
+    }
+
   }
 
 
   // input events
   Keyboard.clear()
-  ScreenCaptureKey.use()
   Keyboard.use()
   Keyboard.bind("t", ()=>{SaveTheTrees.save("t.json")})
   Keyboard.bind("r", ()=>{SaveTheTrees.load("t.json")})
@@ -217,6 +266,41 @@ Trackpad.bind( (i,f) => {
 
   }
 })
+
+
+
+// recv byte array from floor machine
+class RecvActor extends Actor with akka.actor.ActorLogging {
+  var busy = false
+
+  override def preStart() = {
+    log.debug("Starting")
+  }
+  override def preRestart(reason: Throwable, message: Option[Any]) {
+    log.error(reason, "Restarting due to [{}] when processing [{}]",
+      reason.getMessage, message.getOrElse(""))
+  }
+
+  def receive = {
+    case (w:Int,h:Int) =>
+      log.error("resize")
+      Script.w = w
+      Script.h = h
+      Script.dirty = true
+    case "free" => busy = false
+    case msg if !busy =>
+      msg match{
+        case b:Array[Byte] =>
+          busy = true
+          Script.bytes = b
+          Script.update = true
+      }
+
+    case _ => ()
+  }
+}
+
+
 
 
 
