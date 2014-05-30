@@ -105,17 +105,17 @@ object Script extends SeerScript {
   Camera.nav.pos.set(0,1,1)
 
   var dirty = true
-  var update = false
+  var update = true
 
   var receiver:ActorRef = _
 
   var trees = ListBuffer[ATree]()
   trees += new ATree(9)
-  trees += new ATree(7)
-  trees += new ATree(7)
-  trees += new ATree(7)
+  trees += new ATree(8)
+  trees += new ATree(8)
+  trees += new ATree(8)
   val tree = trees(0)
-  TreeNode.model.material = Material.specular
+  // TreeNode.model.material = Material.specular
   tree.visible = 1
 
   // tree.root.position.set(0,-2,-4)
@@ -136,29 +136,75 @@ object Script extends SeerScript {
   lquad.material.textureMix = 1.f
   rquad.material.textureMix = 1.f
 
+  var inited = false
+  var floorTexNode:TextureNode = _
+  var floorNode:RenderNode = _
+  var ncompNode:RenderNode = _
+
+  var (feed,kill) = (0.062,0.062)
+  var (blend0,blend1) = (1.f,0.5f)
+
+  def loadShaders(){
+    Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd_img.frag")).monitor
+    Shader.load("colorize", File("shaders/basic.vert"), File("shaders/colorize.frag")).monitor
+    Shader.load("ncomposite", File("shaders/basic.vert"), File("shaders/ncomp_wall.frag")).monitor
+  }
+
   override def onLoad(){
+  }
+
+  override def init(){
+    loadShaders()
+
+    floorTexNode = new TextureNode(texture)
+    floorNode = new RenderNode
+    floorNode.shader = "texture"
+    floorNode.scene.push( Plane())
+    // floorNode.scene.push( Plane().translate(0.5,0,0).scale(.5,1,1))
+    // floorNode.scene.push( Plane().translate(-0.5,0,0).scale(-.5,1,1))
+    floorTexNode.outputTo(floorNode)
+
+    ncompNode = new RenderNode
+    ncompNode.shader = "ncomposite"
+    ncompNode.clear = false
+    ncompNode.scene.push(Plane())
+    SceneGraph.root.outputTo(ncompNode)
+    floorNode.outputTo(ncompNode)
+    // ncompNode.outputTo(ScreenNode)
+
+    val request = system.actorFor("akka://seer@192.168.0.109:2552/user/resize")
+    if( request != null ){
+      println("requesting resize")
+      request ! "request"
+    }
+    inited = true
+
   }
 
   override def draw(){
     FPS.print
     trees.foreach(_.draw)
-    lquad.draw
-    rquad.draw
+    // lquad.draw
+    // rquad.draw
+
+    floorNode.render
+    ncompNode.render
   }
 
   override def preUnload(){
     receiver ! akka.actor.PoisonPill
+    ScreenNode.inputs.clear
+    SceneGraph.root.outputs.clear
+    send.disconnect
+    recv.disconnect
   }
 
   
   override def animate(dt:Float){
-    trees.foreach(_.animate(dt))
-
-    if( receiver == null) receiver = system.actorOf(Props(new RecvActor ), name = "puddle")
 
     if( dirty ){  // resize everything if using sub image
       pix = new Pixmap(w,h, Pixmap.Format.RGB888)
-      bytes = new Array[Byte](w*h*3)
+      bytes = Array.fill(w*h*3)(255.toByte)
       val s1 = Vec3(1.f,-(h/w.toFloat), 1.f)
       val s2 = Vec3(-1.f,-(h/w.toFloat), 1.f)
       lquad.scale.set(s1)
@@ -166,9 +212,16 @@ object Script extends SeerScript {
       if(texture != null) texture.dispose
       texture = new GdxTexture(pix)
       lquad.material.texture = Some(texture) 
-      rquad.material.texture = Some(texture) 
+      rquad.material.texture = Some(texture)
+      if(floorTexNode != null) floorTexNode.texture = texture 
       dirty = false
     }
+
+    if(!inited) init()
+
+    trees.foreach(_.animate(dt))
+
+    if( receiver == null) receiver = system.actorOf(Props(new RecvActor ), name = "puddle")
 
     if(update){
       try{
@@ -183,6 +236,28 @@ object Script extends SeerScript {
       receiver ! "free"
     }
 
+    Shader("rd")
+    var s = Shader.shader.get
+    s.uniforms("brush") = Mouse.xy()
+    s.uniforms("width") = Window.width.toFloat
+    s.uniforms("height") = Window.height.toFloat
+    s.uniforms("F") = feed //0.037 //62
+    s.uniforms("K") = kill //0.06 //093
+    s.uniforms("dt") = dt
+
+    Shader("colorize")
+    s = Shader.shader.get
+    s.uniforms("color1") = RGBA(0,0,0,0)
+    s.uniforms("color2") = RGBA(1,0,0,.3f)
+    s.uniforms("color3") = RGBA(0,0,1,.4f)
+    s.uniforms("color4") = RGBA(0,1,1,.5f)
+    s.uniforms("color5") = RGBA(0,0,0,.6f)
+
+    Shader("ncomposite")
+    s = Shader.shader.get
+    s.uniforms("u_blend0") = blend0
+    s.uniforms("u_blend1") = blend1
+
   }
 
 
@@ -196,14 +271,6 @@ object Script extends SeerScript {
   Keyboard.bind("3", ()=>{idx=2;})
   Keyboard.bind("4", ()=>{idx=3;})
   Keyboard.bind("0", ()=>{idx= -1;})
-
-  OSC.disconnect
-  OSC.clear()
-  OSC.listen(8008)
-  OSC.bindp {
-    case Message("/test",f:Float) => println(s"test: $f")
-    case _ => ()
-  }
 
   var B = Pose()
   // VRPN.clear
@@ -223,50 +290,61 @@ object Script extends SeerScript {
 
   //   t.refresh()
   // })
+
+  Trackpad.clear
+  Trackpad.connect
+  Trackpad.bind( (i,f) => {
+
+    // var t = new ATree
+    // if( idx >= 0){ 
+      val t = trees(idx)
+      t.visible = 1
+    // }
+
+    i match {
+      case 1 =>
+        val ur = Vec3(1,0,0) //Camera.nav.ur()
+        val uf = Vec3(0,0,1) //Camera.nav.uf()
+
+        trees.foreach{ case t =>
+          t.root.applyForce( ur*(f(0)-0.5) * 2.0*f(4) )
+          t.root.applyForce( uf*(f(1)-0.5) * -2.0*f(4) )
+        }
+      case 2 =>
+        t.mx += f(2)*0.05  
+        t.my += f(3)*0.05
+      case 3 =>
+        t.ry += f(2)*0.05  
+        t.mz += f(3)*0.01
+        if (t.mz < 0.08) t.mz = 0.08
+        if (t.mz > 3.0) t.mz = 3.0 
+      case 4 =>
+        t.rz += f(3)*0.05
+        t.rx += f(2)*0.05
+      case _ => ()
+    }
+
+    t.root.pose.pos.set(t.mx,t.my,0)
+
+    if(i > 2){
+      t.update(t.mz,t.rx,t.ry,t.rz) 
+
+    }
+  })
+
+
+  // OSC
+  val send = new OSCSend
+  send.connect("localhost", 8010)
+  val recv = new OSCRecv
+  recv.listen(8011)
+  recv.bindp {
+    case Message("/rd/fk",f:Float,k:Float) => println("update fk"); feed = f; kill = k;
+    case Message("/ncomp/blend0",f:Float) => blend0 = f
+    case Message("/ncomp/blend1",f:Float) => blend1 = f
+    case m => println(m)
+  }
 }
-
-
-Trackpad.clear
-Trackpad.connect
-Trackpad.bind( (i,f) => {
-
-  // var t = new ATree
-  // if( idx >= 0){ 
-    val t = Script.trees(idx)
-    t.visible = 1
-  // }
-
-  i match {
-    case 1 =>
-      val ur = Vec3(1,0,0) //Camera.nav.ur()
-      val uf = Vec3(0,0,1) //Camera.nav.uf()
-
-      Script.trees.foreach{ case t =>
-        t.root.applyForce( ur*(f(0)-0.5) * 2.0*f(4) )
-        t.root.applyForce( uf*(f(1)-0.5) * -2.0*f(4) )
-      }
-    case 2 =>
-      t.mx += f(2)*0.05  
-      t.my += f(3)*0.05
-    case 3 =>
-      t.ry += f(2)*0.05  
-      t.mz += f(3)*0.01
-      if (t.mz < 0.08) t.mz = 0.08
-      if (t.mz > 3.0) t.mz = 3.0 
-    case 4 =>
-      t.rz += f(3)*0.05
-      t.rx += f(2)*0.05
-    case _ => ()
-  }
-
-  t.root.pose.pos.set(t.mx,t.my,0)
-
-  if(i > 2){
-    t.update(t.mz,t.rx,t.ry,t.rz) 
-
-  }
-})
-
 
 
 // recv byte array from floor machine
