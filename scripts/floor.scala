@@ -74,7 +74,8 @@ class Agent extends Animatable {
 
 object Script extends SeerScript {
 
-  val remote = system.actorFor("akka://seer@192.168.0.101:2552/user/puddle")
+  var remote:ActorRef = _
+  val local:ActorRef = system.actorOf(Props(new LocalActor ), name = "resize")
 
   OpenCV.loadLibrary()
 
@@ -164,8 +165,6 @@ object Script extends SeerScript {
 
     resize(560,410,710,510) // ceilingcam
 
-    remote ! ((w*scale).toInt,(h*scale).toInt)
-
     SceneGraph.root.camera = new OrthographicCamera(2,2)
 
     inited = true
@@ -186,6 +185,7 @@ object Script extends SeerScript {
 	}
 
 	override def preUnload(){
+    local ! akka.actor.PoisonPill
 		send.disconnect
 		recv.disconnect
 	}
@@ -244,6 +244,11 @@ object Script extends SeerScript {
     }
 
     if(!inited) init()
+
+    if( remote == null){
+      remote = system.actorFor("akka://seer@192.168.0.101:2552/user/puddle")
+      if(remote != null) remote ! ((w*scale).toInt,(h*scale).toInt)
+    }
 
     // RD animate
 
@@ -307,7 +312,7 @@ object Script extends SeerScript {
 		bb.put(bytes)
 		bb.rewind()
 
-    remote ! bytes
+    if(remote != null) remote ! bytes
 
     // update texture from pixmap
 		texture.draw(pix,0,0)
@@ -369,7 +374,29 @@ object Script extends SeerScript {
     case Message("/ncomp/blend0",f:Float) => blend0 = f
     case Message("/ncomp/blend1",f:Float) => blend1 = f
   }
+
+
+  class LocalActor extends Actor with akka.actor.ActorLogging {
+    override def preStart() = {
+      log.debug("Starting")
+    }
+    override def preRestart(reason: Throwable, message: Option[Any]) {
+      log.error(reason, "Restarting due to [{}] when processing [{}]",
+        reason.getMessage, message.getOrElse(""))
+    }
+    def receive = {
+      case "request" => 
+        println("resize requested")
+        // if( remote == null){
+        val remote = system.actorFor("akka://seer@192.168.0.101:2552/user/puddle")
+        // }
+        if(remote != null) remote ! ((w*scale).toInt,(h*scale).toInt)
+
+      case _ => ()
+    }
+  }
 }
+
 
 
 Script
