@@ -27,8 +27,8 @@ void main(){
     float b = clamp(t - d, 0.0,1.0);
 
 	// pull everything we want from the textures
-	vec4 color0 = texture2D(u_texture0, v_uv) * 0.65; // u_blend0;
-	vec4 color1 = texture2D(u_texture1, v_uv) * 0.5; //u_blend1;
+	vec4 color0 = texture2D(u_texture0, v_uv) * u_blend0;
+	vec4 color1 = texture2D(u_texture1, v_uv) * u_blend1;
 	// vec4 color2 = texture2D(u_texture2, v_uv) * u_blend2;
 	// vec4 color3 = texture2D(u_texture3, v_uv) * u_blend3;
 

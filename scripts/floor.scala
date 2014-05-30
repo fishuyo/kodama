@@ -74,7 +74,7 @@ class Agent extends Animatable {
 
 object Script extends SeerScript {
 
-  // val remote = system.actorFor("akka://seer@192.168.0.101:2552/user/puddle")
+  val remote = system.actorFor("akka://seer@192.168.0.101:2552/user/puddle")
 
   OpenCV.loadLibrary()
 
@@ -84,7 +84,10 @@ object Script extends SeerScript {
 	var bytes:Array[Byte] = null
 	var (w,ww,h,hh) = (0.0,0.0,0.0,0.0)
 
+
   val capture = new VideoCapture(0)
+  Thread.sleep(250)
+
   w = capture.get(Highgui.CV_CAP_PROP_FRAME_WIDTH)
   h = capture.get(Highgui.CV_CAP_PROP_FRAME_HEIGHT)
   
@@ -101,13 +104,10 @@ object Script extends SeerScript {
   val quad = Plane()
   quad.material = Material.basic
 
-  var scale = 1.
-  resize(560,410,710,510) // ceilingcam
-
-  // remote ! ("resize",w.toInt,h.toInt)
-
+  var scale = 0.5
 
   // RD
+  var (feed,kill) = (0.025f,0.06f)
   var rdNode:RDNode = null
   var inited = false
 
@@ -123,6 +123,7 @@ object Script extends SeerScript {
     a
   }
 
+  var (blend0,blend1) = (0.95,0.6)
   var ncompNode:RenderNode = null
   var colorizeNode:RenderNode = null
 
@@ -160,6 +161,12 @@ object Script extends SeerScript {
     SceneGraph.root.outputTo(ncompNode)
     colorizeNode.outputTo(ncompNode)
     ncompNode.outputTo(ScreenNode)
+
+    resize(560,410,710,510) // ceilingcam
+
+    remote ! ((w*scale).toInt,(h*scale).toInt)
+
+    SceneGraph.root.camera = new OrthographicCamera(2,2)
 
     inited = true
 
@@ -227,7 +234,7 @@ object Script extends SeerScript {
     if( dirty ){  // resize everything if using sub image
       pix = new Pixmap((w*scale).toInt,(h*scale).toInt, Pixmap.Format.RGB888)
       bytes = new Array[Byte]((h.toInt*scale*w.toInt*scale*3).toInt)
-      quad.scale.set(-1.f, -(h/w).toFloat, 1.f)
+      quad.scale.set(-1.f, -1.f/*-(h/w).toFloat*/, 1.f)
       if(texture != null) texture.dispose
       texture = new GdxTexture(pix) 
       quad.material.texture = Some(texture)
@@ -245,8 +252,8 @@ object Script extends SeerScript {
     s.uniforms("brush") = Mouse.xy()
     s.uniforms("width") = Window.width.toFloat
     s.uniforms("height") = Window.height.toFloat
-    s.uniforms("feed") = 0.037 //62
-    s.uniforms("kill") = 0.06 //093
+    s.uniforms("F") = feed //0.037 //62
+    s.uniforms("K") = kill //0.06 //093
     s.uniforms("dt") = dt
 
     Shader("colorize")
@@ -256,6 +263,12 @@ object Script extends SeerScript {
     s.uniforms("color3") = RGBA(0,0,1,.4f)
     s.uniforms("color4") = RGBA(0,1,1,.5f)
     s.uniforms("color5") = RGBA(0,0,0,.6f)
+
+    Shader("ncomposite")
+    s = Shader.shader.get
+    s.uniforms("u_blend0") = blend0
+    s.uniforms("u_blend1") = blend1
+
 
     agents.foreach( _.animate(dt))
 
@@ -294,7 +307,7 @@ object Script extends SeerScript {
 		bb.put(bytes)
 		bb.rewind()
 
-    // remote ! bytes
+    remote ! bytes
 
     // update texture from pixmap
 		texture.draw(pix,0,0)
@@ -352,7 +365,9 @@ object Script extends SeerScript {
   val recv = new OSCRecv
   recv.listen(8011)
   recv.bindp {
-    case _ => ()
+    case Message("/rd/fk",f:Float,k:Float) => println("update fk"); feed = f; kill = k;
+    case Message("/ncomp/blend0",f:Float) => blend0 = f
+    case Message("/ncomp/blend1",f:Float) => blend1 = f
   }
 }
 

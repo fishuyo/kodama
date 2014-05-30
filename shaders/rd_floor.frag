@@ -10,8 +10,8 @@ uniform sampler2D u_texture1;
 uniform float width;
 uniform float height;
 // uniform float dt;
-// uniform float feed;
-// uniform float kill;
+uniform float F;
+uniform float K;
 uniform vec2 brush;
 
 float dt = 0.8; //0.8; //515;
@@ -62,8 +62,8 @@ void main(){
     // float F = 0.026; //brains
     // float K = 0.055;
 
-    float F = 0.082; //worms
-    float K = 0.061;
+    // float F = 0.082; //worms
+    // float K = 0.061;
 
     // float F = 0.082; //worm channels
     // float K = 0.059;
