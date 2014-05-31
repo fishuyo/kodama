@@ -109,6 +109,7 @@ object Script extends SeerScript {
 
   // RD
   var (feed,kill) = (0.025f,0.06f)
+  var resizeRD = false
   var rdNode:RDNode = null
   var inited = false
 
@@ -245,6 +246,11 @@ object Script extends SeerScript {
 
     if(!inited) init()
 
+    if(resizeRD){
+      rdNode.resize(Viewport(0,0,Window.width,Window.height))
+      resizeRD = false
+    }
+
     if( remote == null){
       remote = system.actorFor("akka://seer@192.168.0.101:2552/user/puddle")
       if(remote != null) remote ! ((w*scale).toInt,(h*scale).toInt)
@@ -254,7 +260,9 @@ object Script extends SeerScript {
 
     Shader("rd")
     var s = Shader.shader.get
-    s.uniforms("brush") = Mouse.xy()
+    val bx = map(B.pos.x,-.9,.9,0,1)
+    val by = map(B.pos.z,.7,-.7,0,1)
+    s.uniforms("brush") = Vec2(bx,by) //Mouse.xy()
     s.uniforms("width") = Window.width.toFloat
     s.uniforms("height") = Window.height.toFloat
     s.uniforms("F") = feed //0.037 //62
@@ -363,6 +371,16 @@ object Script extends SeerScript {
 	//   loop.setAlpha(decay)
 	// })
 
+  var B = Pose()
+  var Blast = Pose()
+  var Bvel = Vec3()
+  VRPN.clear
+  VRPN.bind("gnarl", (p)=>{
+    Blast = B
+    B = B.lerp(p,0.1f)
+    Bvel = p.pos - Blast.pos
+  })
+
 
 	// OSC
   val send = new OSCSend
@@ -371,6 +389,7 @@ object Script extends SeerScript {
   recv.listen(8011)
   recv.bindp {
     case Message("/rd/fk",f:Float,k:Float) => println("update fk"); feed = f; kill = k;
+    case Message("/rd/clear") => println("clear rd buffer"); resizeRD = true
     case Message("/ncomp/blend0",f:Float) => blend0 = f
     case Message("/ncomp/blend1",f:Float) => blend1 = f
   }

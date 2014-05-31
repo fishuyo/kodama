@@ -117,7 +117,7 @@ void main(){
         // brsh.y = 1.0 - brsh.y;
         vec2 diff = (v_uv - brsh)/vec2(dx,dy);
         float dist = dot(diff, diff);
-        if(dist < 10.0)
+        if(dist < 2000.0)
             dst.g = 0.9;
     }
     
