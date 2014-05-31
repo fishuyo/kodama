@@ -27,6 +27,10 @@ import de.sciss.osc.Message
 
 Shader.bg.set(0,0,0,1)
 
+
+///
+/// Trees
+///
 var idx = 0
 
 class ATree(b:Int=8) extends Tree {
@@ -36,6 +40,8 @@ class ATree(b:Int=8) extends Tree {
   setReseed(true)
   setDepth(b)
   branch(b)
+
+  def update(){ update(mz,rx,ry,rz)}
 
   override def draw(){ if(visible==1) super.draw() }
   override def animate(dt:Float){ if(visible==1) super.animate(dt) }
@@ -100,6 +106,52 @@ object SaveTheTrees {
 
 
 
+////
+//// Agents
+///
+class Flock {
+
+}
+
+class Agent extends Animatable {
+  var nav = Nav()
+  val b = Sphere().scale(.01,.01,.025)
+  b.material = Material.specular
+  b.material.color = RGB(0,1,1) 
+  // for(i <- 0 until 7){ 
+  //  val w = Circle().translate(0,0,1-i/3.5f)
+  //  w.material = Material.specular
+  //  w.material.color = RGB(0,1,1)
+  //  w.scale(1.5f - math.abs(w.pose.pos.z))
+  //  b.addChild(w)
+  // }
+
+  // Schedule.cycle(1 second){ case t =>
+  //  b.children.zipWithIndex.foreach{
+  //    case (c,i) => c.scale.set(1+t+i/7.f)
+  //  }
+  // }
+
+  override def draw(){ 
+    b.pose = nav
+    b.draw
+  }
+  override def animate(dt:Float){
+    nav.step(dt)
+    nav.pos.wrap(Vec3(-1,-1,-.05),Vec3(1,1,.05))
+    if(math.abs(nav.pos.z) < 0.01){
+      Shader("rd")
+      var s = Shader.shader.get
+      s.uniforms("brush") = (nav.pos.xy+Vec2(1,1))*0.5
+    }
+  }
+}
+
+///
+/// Script
+///
+///
+
 object Script extends SeerScript {
 
   Camera.nav.pos.set(0,1,1)
@@ -127,22 +179,22 @@ object Script extends SeerScript {
   var pix:Pixmap = null
   var texture:GdxTexture = null
 
-  val lquad = Plane().translate(1.,.99,0)
-  val rquad = Plane().translate(-1.,1,0)
-  lquad.material = Material.basic
-  rquad.material = Material.basic
-  lquad.material.color = RGB.black
-  rquad.material.color = RGB.black
-  lquad.material.textureMix = 1.f
-  rquad.material.textureMix = 1.f
+  val agents = for(i <- 0 until 10) yield {
+    val a = new Agent
+    a.nav.vel = Vec3(0,0,.1)
+    a.nav.angVel = Random.vec3()
+    a
+  }
 
   var inited = false
   var floorTexNode:TextureNode = _
   var floorNode:RenderNode = _
   var ncompNode:RenderNode = _
+  var rdNode:RDNode = _
 
   var (feed,kill) = (0.062,0.062)
   var (blend0,blend1) = (1.f,0.5f)
+  var speed = 1.f
 
   def loadShaders(){
     Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd_img.frag")).monitor
@@ -156,12 +208,14 @@ object Script extends SeerScript {
   override def init(){
     loadShaders()
 
+    rdNode = new RDNode
+
     floorTexNode = new TextureNode(texture)
     floorNode = new RenderNode
     floorNode.shader = "texture"
-    floorNode.scene.push( Plane())
-    // floorNode.scene.push( Plane().translate(0.5,0,0).scale(.5,1,1))
-    // floorNode.scene.push( Plane().translate(-0.5,0,0).scale(-.5,1,1))
+    // floorNode.scene.push( Plane())
+    floorNode.scene.push( Plane().translate(0.5,0,0).scale(.5,-1,1))
+    floorNode.scene.push( Plane().translate(-0.5,0,0).scale(-.5,-1,1))
     floorTexNode.outputTo(floorNode)
 
     ncompNode = new RenderNode
@@ -184,8 +238,6 @@ object Script extends SeerScript {
   override def draw(){
     FPS.print
     trees.foreach(_.draw)
-    // lquad.draw
-    // rquad.draw
 
     floorNode.render
     ncompNode.render
@@ -205,14 +257,8 @@ object Script extends SeerScript {
     if( dirty ){  // resize everything if using sub image
       pix = new Pixmap(w,h, Pixmap.Format.RGB888)
       bytes = Array.fill(w*h*3)(255.toByte)
-      val s1 = Vec3(1.f,-(h/w.toFloat), 1.f)
-      val s2 = Vec3(-1.f,-(h/w.toFloat), 1.f)
-      lquad.scale.set(s1)
-      rquad.scale.set(s2)
       if(texture != null) texture.dispose
       texture = new GdxTexture(pix)
-      lquad.material.texture = Some(texture) 
-      rquad.material.texture = Some(texture)
       if(floorTexNode != null) floorTexNode.texture = texture 
       dirty = false
     }
@@ -273,23 +319,17 @@ object Script extends SeerScript {
   Keyboard.bind("0", ()=>{idx= -1;})
 
   var B = Pose()
-  // VRPN.clear
-  // VRPN.bind("b", (p)=>{
-  //   B = B.lerp(p,0.1f)
-  //   val q = -B.quat.toZ() //toEulerVec()
-  //   // println(q)
-  //   val t = Script.tree
-  //   t.bAngle.y.setMinMax( 0.05, q.x,false )
-  //   // t.sAngle.x.setMinMax( 0.15, B.pos.x, false )
-  //   // t.bAngle.x.setMinMax( 0.15, B.pos.x, false )
-  //   // t.sAngle.z.setMinMax( 0.05, q.z, false )
-  //   // t.bAngle.z.setMinMax( 0.05, q.z, false )
-
-  //   t.sRatio.setMinMax( 0.15, B.pos.y, false )
-  //   t.bRatio.setMinMax( 0.15, B.pos.y, false )
-
-  //   t.refresh()
-  // })
+  VRPN.clear
+  VRPN.bind("gnarl", (p)=>{
+    B = B.lerp(p,0.1f)
+    val e = B.quat.toEulerVec()
+    val t = trees(idx)
+    t.ry = -B.pos.x + math.sin(B.pos.y*15)*0.04 //map(B.pos.y,0,2,0,0.2)
+    t.mz = map(B.pos.mag,0,5,0,1) + map(B.pos.y,0,2,0.5,1.3)
+    t.rx = e.y / 2.f 
+    t.rz = map(B.pos.z,-4,4,0,16)
+    t.update()
+  })
 
   Trackpad.clear
   Trackpad.connect
@@ -324,7 +364,7 @@ object Script extends SeerScript {
       case _ => ()
     }
 
-    t.root.pose.pos.set(t.mx,t.my,0)
+    t.root.pose.pos.set(t.mx,0,-t.my)
 
     if(i > 2){
       t.update(t.mz,t.rx,t.ry,t.rz) 
@@ -342,6 +382,7 @@ object Script extends SeerScript {
     case Message("/rd/fk",f:Float,k:Float) => println("update fk"); feed = f; kill = k;
     case Message("/ncomp/blend0",f:Float) => blend0 = f
     case Message("/ncomp/blend1",f:Float) => blend1 = f
+    case Message("/gnarl/speed", f:Float) => speed = f
     case m => println(m)
   }
 }
