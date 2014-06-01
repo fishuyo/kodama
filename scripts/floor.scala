@@ -144,7 +144,7 @@ object Script extends SeerScript {
     loadShaders()
     rdNode = new RDNode
     // rdNode.camera = Camera //weirdness
-    // SceneGraph.roots += rdNode
+    SceneGraph.roots += rdNode
 
     // loopNode = new TextureNode( texture )
     // loopNode.outputTo(ScreenNode)
@@ -197,7 +197,7 @@ object Script extends SeerScript {
     ScreenNode.inputs.clear
     SceneGraph.removeNode(loopNode)
 
-    // SceneGraph.roots -= rdNode
+    SceneGraph.roots -= rdNode
 
 	}
 
