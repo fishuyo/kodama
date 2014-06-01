@@ -115,6 +115,7 @@ class Flock {
 
 class Agent extends Animatable {
   var nav = Nav()
+  nav.pos = Random.vec3()
   val b = Sphere().scale(.01,.01,.025)
   b.material = Material.specular
   b.material.color = RGB(0,1,1) 
@@ -138,11 +139,12 @@ class Agent extends Animatable {
   }
   override def animate(dt:Float){
     nav.step(dt)
-    nav.pos.wrap(Vec3(-1,-1,-.05),Vec3(1,1,.05))
+    nav.pos.wrap(Vec3(-2,0,-2),Vec3(2,4,2))
     if(math.abs(nav.pos.z) < 0.01){
       Shader("rd")
       var s = Shader.shader.get
-      s.uniforms("brush") = (nav.pos.xy+Vec2(1,1))*0.5
+      val p = Camera.project( new com.badlogic.gdx.math.Vector3(nav.pos.x,nav.pos.y,nav.pos.z))
+      s.uniforms("brush") = Vec2(p.x/Window.width,p.y/Window.height)  
     }
   }
 }
@@ -179,7 +181,7 @@ object Script extends SeerScript {
   var pix:Pixmap = null
   var texture:GdxTexture = null
 
-  val agents = for(i <- 0 until 10) yield {
+  val agents = for(i <- 0 until 150) yield {
     val a = new Agent
     a.nav.vel = Vec3(0,0,.1)
     a.nav.angVel = Random.vec3()
@@ -191,13 +193,18 @@ object Script extends SeerScript {
   var floorNode:RenderNode = _
   var ncompNode:RenderNode = _
   var rdNode:RDNode = _
+  var colorizeNode:RenderNode = _
 
-  var (feed,kill) = (0.062,0.062)
-  var (blend0,blend1) = (1.f,0.5f)
+  var resizeRD = true
+  var (feed,kill) = (0.082,0.061)
+  var (blend0,blend1,blend2) = (1.f,0.5f,0.5f)
   var speed = 1.f
 
+  var nav = Nav()
+  nav.pos.set(0,1,1)
+
   def loadShaders(){
-    Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd_img.frag")).monitor
+    Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd_wall.frag")).monitor
     Shader.load("colorize", File("shaders/basic.vert"), File("shaders/colorize.frag")).monitor
     Shader.load("ncomposite", File("shaders/basic.vert"), File("shaders/ncomp_wall.frag")).monitor
   }
@@ -208,7 +215,17 @@ object Script extends SeerScript {
   override def init(){
     loadShaders()
 
+    val material = Material.specular
+    material.color.set(0,1,1)
+    material.loadTexture("res/scales.png")
+    material.textureMix = 0.5f
+    agents.foreach(_.b.material = material)
+
     rdNode = new RDNode
+    colorizeNode = new RenderNode
+    colorizeNode.shader = "colorize"
+    colorizeNode.scene.push(Plane())
+    rdNode.outputTo(colorizeNode)
 
     floorTexNode = new TextureNode(texture)
     floorNode = new RenderNode
@@ -224,6 +241,7 @@ object Script extends SeerScript {
     ncompNode.scene.push(Plane())
     SceneGraph.root.outputTo(ncompNode)
     floorNode.outputTo(ncompNode)
+    colorizeNode.outputTo(ncompNode)
     // ncompNode.outputTo(ScreenNode)
 
     val request = system.actorFor("akka://seer@192.168.0.109:2552/user/resize")
@@ -238,8 +256,11 @@ object Script extends SeerScript {
   override def draw(){
     FPS.print
     trees.foreach(_.draw)
+    agents.foreach(_.draw)
 
     floorNode.render
+    for(i <- 0 until 10) rdNode.render
+    colorizeNode.render
     ncompNode.render
   }
 
@@ -253,6 +274,9 @@ object Script extends SeerScript {
 
   
   override def animate(dt:Float){
+    nav.step(dt)
+    nav.pos.wrap(Vec3(-2,0,-2),Vec3(2,4,2))
+    Camera.nav.set(nav)
 
     if( dirty ){  // resize everything if using sub image
       pix = new Pixmap(w,h, Pixmap.Format.RGB888)
@@ -282,6 +306,11 @@ object Script extends SeerScript {
       receiver ! "free"
     }
 
+    if(resizeRD){
+      rdNode.resize(Viewport(0,0,1920,512))
+      resizeRD = false
+    }
+
     Shader("rd")
     var s = Shader.shader.get
     s.uniforms("brush") = Mouse.xy()
@@ -303,9 +332,15 @@ object Script extends SeerScript {
     s = Shader.shader.get
     s.uniforms("u_blend0") = blend0
     s.uniforms("u_blend1") = blend1
+    s.uniforms("u_blend2") = blend2
+
+    agents.foreach(_.animate(dt))
 
   }
 
+
+  Mouse.clear
+  Mouse.use
 
   // input events
   Keyboard.clear()
@@ -330,6 +365,14 @@ object Script extends SeerScript {
     t.rz = map(B.pos.z,-4,4,0,16)
     t.update()
   })
+
+  var A = Pose()
+  VRPN.bind("a", (p)=>{
+    A = A.lerp(p,0.1f)
+    nav.vel.set(0,0,A.pos.z* -0.3)
+    nav.angVel.set((A.pos.y-1)*0.3,A.pos.x* -0.3,0)
+  })
+
 
   Trackpad.clear
   Trackpad.connect
@@ -380,8 +423,10 @@ object Script extends SeerScript {
   recv.listen(8011)
   recv.bindp {
     case Message("/rd/fk",f:Float,k:Float) => println("update fk"); feed = f; kill = k;
+    case Message("/rd/clear") => println("clear rd"); resizeRD = true
     case Message("/ncomp/blend0",f:Float) => blend0 = f
     case Message("/ncomp/blend1",f:Float) => blend1 = f
+    case Message("/ncomp/blend2",f:Float) => blend2 = f
     case Message("/gnarl/speed", f:Float) => speed = f
     case m => println(m)
   }
