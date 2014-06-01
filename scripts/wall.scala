@@ -14,6 +14,7 @@ import particle._
 import scala.collection.mutable.ListBuffer
 
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.Pixmap
 import com.badlogic.gdx.graphics.{Texture => GdxTexture}
 
@@ -22,8 +23,14 @@ import akka.event.Logging
 
 import de.sciss.osc.Message
  
+import concurrent.duration._
 
 
+Scene.alpha = .3
+SceneGraph.root.depth = false
+
+Camera.nav.pos.set(0,1,4)
+Camera.nav.quat.set(1,0,0,0)
 
 Shader.bg.set(0,0,0,1)
 
@@ -156,7 +163,7 @@ class Agent extends Animatable {
 
 object Script extends SeerScript {
 
-  Camera.nav.pos.set(0,1,1)
+  implicit def f2i(f:Float) = f.toInt
 
   var dirty = true
   var update = true
@@ -181,13 +188,35 @@ object Script extends SeerScript {
   var pix:Pixmap = null
   var texture:GdxTexture = null
 
-  val agents = for(i <- 0 until 150) yield {
+  val agents = for(i <- 0 until 0) yield {
     val a = new Agent
     a.nav.vel = Vec3(0,0,.1)
     a.nav.angVel = Random.vec3()
     a
   }
 
+  // fabric
+  val np = 35
+  val mesh = Plane.generateMesh(10,10,np,np,Quat.up)
+  mesh.primitive = Lines
+  val model = Model(mesh)
+  model.material = Material.specular
+  model.material.color = RGB(0,0.5,0.7)
+
+  val fabric = new SpringMesh(mesh,1.f)
+  fabric.pins += AbsoluteConstraint(fabric.particles(0), fabric.particles(0).position)
+  fabric.pins += AbsoluteConstraint(fabric.particles(np), fabric.particles(np).position)
+  // fabric.pins += AbsoluteConstraint(fabric.particles(0), fabric.particles(0).position)
+  fabric.pins += AbsoluteConstraint(fabric.particles.last, fabric.particles.last.position)
+  Gravity.set(0,0,0)
+
+  val sun = Sphere().scale(0.1f)
+  var blend = GL20.GL_ONE_MINUS_SRC_ALPHA
+  val cursor = Sphere().scale(0.05)
+  var lpos = Vec2()
+  var vel = Vec2()
+
+  // render nodes
   var inited = false
   var floorTexNode:TextureNode = _
   var floorNode:RenderNode = _
@@ -200,6 +229,7 @@ object Script extends SeerScript {
   var (blend0,blend1,blend2) = (1.f,0.5f,0.5f)
   var speed = 1.f
 
+  // liquid nav
   var nav = Nav()
   nav.pos.set(0,1,1)
 
@@ -258,6 +288,12 @@ object Script extends SeerScript {
     trees.foreach(_.draw)
     agents.foreach(_.draw)
 
+    //fabric
+    Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, blend)
+    model.draw
+    sun.draw
+    cursor.draw
+
     floorNode.render
     for(i <- 0 until 10) rdNode.render
     colorizeNode.render
@@ -274,9 +310,9 @@ object Script extends SeerScript {
 
   
   override def animate(dt:Float){
-    nav.step(dt)
-    nav.pos.wrap(Vec3(-2,0,-2),Vec3(2,4,2))
-    Camera.nav.set(nav)
+    // nav.step(dt)
+    // nav.pos.wrap(Vec3(-2,0,-2),Vec3(2,4,2))
+    // Camera.nav.set(nav)
 
     if( dirty ){  // resize everything if using sub image
       pix = new Pixmap(w,h, Pixmap.Format.RGB888)
@@ -336,6 +372,47 @@ object Script extends SeerScript {
 
     agents.foreach(_.animate(dt))
 
+    // fabric
+
+    val x = Mouse.xy().x
+    if( Mouse.status() == "drag"){
+      vel = (Mouse.xy() - lpos)/dt
+      val r = Camera.ray(Mouse.x()*Window.width, (1.f-Mouse.y()) * Window.height)
+      fabric.particles.foreach( (p) => {
+        val t = r.intersectSphere(p.position, 0.25f)
+        if(t.isDefined){
+          p.applyForce(Vec3(vel.x,vel.y,0)*150.f)
+          cursor.pose.pos.set(r(t.get))
+        }
+      })
+    }
+    lpos = Mouse.xy()
+
+    val r = Ray(B.pos+Vec3(0,100,0), Vec3(0,-1,0) )
+    fabric.particles.foreach( (p) => {
+      val t = r.intersectSphere(p.position, 0.25f)
+      if(t.isDefined){
+        p.applyForce(Bvel*150.f)
+        cursor.pose.pos.set(r(t.get))
+      }
+    })
+
+    fabric.animate(speed.abs*1.f*dt)
+
+  }
+
+    // schedule
+  Schedule.clear
+  val cycle = Schedule.cycle(200 seconds){ case t =>
+    val y = 10.f*math.cos(2*Pi*t)
+    val z = 10.f*math.sin(2*Pi*t)
+    Shader.lightPosition.set(Shader.lightPosition.x,y,z)
+    sun.pose.pos.set(Shader.lightPosition)
+  }
+  val cycle2 = Schedule.cycle(1 hour){ case t =>
+    val x = 2.f*math.cos(2*Pi*t)
+    Shader.lightPosition.x = x
+    sun.pose.pos.set(Shader.lightPosition)
   }
 
 
@@ -352,17 +429,26 @@ object Script extends SeerScript {
   Keyboard.bind("3", ()=>{idx=2;})
   Keyboard.bind("4", ()=>{idx=3;})
   Keyboard.bind("0", ()=>{idx= -1;})
+  Keyboard.bind("g", ()=>{
+    mesh.vertices.foreach{ case v => v.set(v.x,v.y+Random.float(-1,1).apply()*0.02*(v.x).abs,v.z) }
+    mesh.recalculateNormals()
+    mesh.update()
+  })
+  Keyboard.bind("5", ()=>{mesh.primitive = Triangles})
+  Keyboard.bind("6", ()=>{mesh.primitive = Lines})
+  Keyboard.bind("7", ()=>{blend = GL20.GL_ONE_MINUS_SRC_ALPHA})
+  Keyboard.bind("8", ()=>{blend = GL20.GL_ONE})
 
-  var B = Pose()
+  var G = Pose()
   VRPN.clear
   VRPN.bind("gnarl", (p)=>{
-    B = B.lerp(p,0.1f)
-    val e = B.quat.toEulerVec()
+    G = G.lerp(p,0.1f)
+    val e = G.quat.toEulerVec()
     val t = trees(idx)
-    t.ry = -B.pos.x + math.sin(B.pos.y*15)*0.04 //map(B.pos.y,0,2,0,0.2)
-    t.mz = map(B.pos.mag,0,5,0,1) + map(B.pos.y,0,2,0.5,1.3)
+    t.ry = -G.pos.x + math.sin(G.pos.y*15)*0.04 //map(G.pos.y,0,2,0,0.2)
+    t.mz = map(G.pos.mag,0,5,0,1) + map(G.pos.y,0,2,0.5,1.3)
     t.rx = e.y / 2.f 
-    t.rz = map(B.pos.z,-4,4,0,16)
+    t.rz = map(G.pos.z,-4,4,0,16)
     t.update()
   })
 
@@ -371,6 +457,15 @@ object Script extends SeerScript {
     A = A.lerp(p,0.1f)
     nav.vel.set(0,0,A.pos.z* -0.3)
     nav.angVel.set((A.pos.y-1)*0.3,A.pos.x* -0.3,0)
+  })
+
+  var B = Pose()
+  var Blast = Pose()
+  var Bvel = Vec3()
+  VRPN.bind("b", (p)=>{
+    Blast = B
+    B = B.lerp(p,0.1f)
+    Bvel = p.pos - Blast.pos
   })
 
 
@@ -428,6 +523,9 @@ object Script extends SeerScript {
     case Message("/ncomp/blend1",f:Float) => blend1 = f
     case Message("/ncomp/blend2",f:Float) => blend2 = f
     case Message("/gnarl/speed", f:Float) => speed = f
+      cycle.speed = speed*20
+      cycle2.speed = speed*20
+
     case m => println(m)
   }
 }
@@ -463,13 +561,6 @@ class RecvActor extends Actor with akka.actor.ActorLogging {
     case _ => ()
   }
 }
-
-
-
-
-
-
-
 
 
 
