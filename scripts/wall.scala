@@ -26,8 +26,8 @@ import de.sciss.osc.Message
 import concurrent.duration._
 
 
-Scene.alpha = .3
-SceneGraph.root.depth = false
+// Scene.alpha = .3
+// SceneGraph.root.depth = false
 
 Camera.nav.pos.set(0,1,4)
 Camera.nav.quat.set(1,0,0,0)
@@ -289,10 +289,10 @@ object Script extends SeerScript {
     agents.foreach(_.draw)
 
     //fabric
-    Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, blend)
-    model.draw
-    sun.draw
-    cursor.draw
+    // Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, blend)
+    // model.draw
+    // sun.draw
+    // cursor.draw
 
     floorNode.render
     for(i <- 0 until 10) rdNode.render
@@ -397,7 +397,7 @@ object Script extends SeerScript {
       }
     })
 
-    fabric.animate(speed.abs*1.f*dt)
+    // fabric.animate(speed.abs*1.f*dt)
 
   }
 
