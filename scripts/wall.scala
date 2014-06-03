@@ -26,10 +26,8 @@ import de.sciss.osc.Message
 import concurrent.duration._
 
 
-// Scene.alpha = .3
-// SceneGraph.root.depth = false
 
-Camera.nav.pos.set(0,1,4)
+Camera.nav.pos.set(0,1.1,4)
 Camera.nav.quat.set(1,0,0,0)
 
 Shader.bg.set(0,0,0,1)
@@ -172,11 +170,14 @@ object Script extends SeerScript {
 
   var trees = ListBuffer[ATree]()
   trees += new ATree(9)
-  trees += new ATree(8)
+  trees += new ATree(9)
   trees += new ATree(8)
   trees += new ATree(8)
   val tree = trees(0)
   // TreeNode.model.material = Material.specular
+  val material0 = Material.basic
+  val material1 = Material.specular
+  material1.color.set(0,1,1)
   tree.visible = 1
 
   // tree.root.position.set(0,-2,-4)
@@ -188,7 +189,8 @@ object Script extends SeerScript {
   var pix:Pixmap = null
   var texture:GdxTexture = null
 
-  val agents = for(i <- 0 until 0) yield {
+  var drawAgents = 0.f
+  val agents = for(i <- 0 until 100) yield {
     val a = new Agent
     a.nav.vel = Vec3(0,0,.1)
     a.nav.angVel = Random.vec3()
@@ -203,6 +205,7 @@ object Script extends SeerScript {
   model.material = Material.specular
   model.material.color = RGB(0,0.5,0.7)
 
+  var drawFabric = 0.f
   val fabric = new SpringMesh(mesh,1.f)
   fabric.pins += AbsoluteConstraint(fabric.particles(0), fabric.particles(0).position)
   fabric.pins += AbsoluteConstraint(fabric.particles(np), fabric.particles(np).position)
@@ -211,7 +214,7 @@ object Script extends SeerScript {
   Gravity.set(0,0,0)
 
   val sun = Sphere().scale(0.1f)
-  var blend = GL20.GL_ONE_MINUS_SRC_ALPHA
+  var blend = GL20.GL_ONE //GL20.GL_ONE_MINUS_SRC_ALPHA
   val cursor = Sphere().scale(0.05)
   var lpos = Vec2()
   var vel = Vec2()
@@ -285,14 +288,29 @@ object Script extends SeerScript {
 
   override def draw(){
     FPS.print
+    if(drawAgents == 1.f){
+      Scene.alpha = .3
+      SceneGraph.root.depth = false
+      Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, blend)
+      TreeNode.model.material = material1
+    } else {
+      Scene.alpha = 1.
+      SceneGraph.root.depth = true
+      TreeNode.model.material = material0
+    }
+
     trees.foreach(_.draw)
-    agents.foreach(_.draw)
+    if(drawAgents == 1.f) agents.foreach(_.draw)
 
     //fabric
-    // Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, blend)
-    // model.draw
+    if(drawFabric == 1.f){
+      Scene.alpha = .3
+      SceneGraph.root.depth = false
+      Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, blend)
+      model.draw
     // sun.draw
     // cursor.draw
+    }
 
     floorNode.render
     for(i <- 0 until 10) rdNode.render
@@ -397,7 +415,7 @@ object Script extends SeerScript {
       }
     })
 
-    // fabric.animate(speed.abs*1.f*dt)
+    if(drawFabric == 1.f)fabric.animate(speed.abs*1.f*dt)
 
   }
 
@@ -413,6 +431,22 @@ object Script extends SeerScript {
     val x = 2.f*math.cos(2*Pi*t)
     Shader.lightPosition.x = x
     sun.pose.pos.set(Shader.lightPosition)
+  }
+
+  val tcycle = Schedule.cycle(5 seconds){ case t =>
+    if( drawAgents == 1.f || drawFabric == 1.f){
+      val c = (math.sin(t*2*Pi)+0.8)*0.5
+      material1.color.set(0,c,c)
+    }
+  }
+  val acycle = Schedule.cycle(150 seconds){ case t =>
+    if( drawAgents == 1.f){
+      val r = 1.f
+      val x = r*math.cos(t*2*Pi)
+      val z = r*math.sin(t*2*Pi)
+      Camera.nav.pos.set(x,1,z)
+      Camera.nav.quat.fromEuler(0.f,-t*2*Pi,0.f)
+    }
   }
 
 
@@ -439,17 +473,22 @@ object Script extends SeerScript {
   Keyboard.bind("7", ()=>{blend = GL20.GL_ONE_MINUS_SRC_ALPHA})
   Keyboard.bind("8", ()=>{blend = GL20.GL_ONE})
 
+  var treesTracker = false
   var G = Pose()
   VRPN.clear
   VRPN.bind("gnarl", (p)=>{
     G = G.lerp(p,0.1f)
     val e = G.quat.toEulerVec()
-    val t = trees(idx)
-    t.ry = -G.pos.x + math.sin(G.pos.y*15)*0.04 //map(G.pos.y,0,2,0,0.2)
-    t.mz = map(G.pos.mag,0,5,0,1) + map(G.pos.y,0,2,0.5,1.3)
-    t.rx = e.y / 2.f 
-    t.rz = map(G.pos.z,-4,4,0,16)
-    t.update()
+    if(treesTracker){
+      // val t = trees(idx)
+      trees.foreach{ case t =>
+        t.ry = math.abs(G.pos.x) + 0.2 + math.sin(G.pos.y*15)*0.04 //map(G.pos.y,0,2,0,0.2)
+        t.mz = map(G.pos.mag,0,5,0,1) + map(G.pos.y,0,2,0.7,1.3)
+        t.rx = e.y /// 2.f 
+        t.rz = map(G.pos.z,-4,4,0,32)
+        t.update()
+      }
+    }
   })
 
   var A = Pose()
@@ -522,6 +561,10 @@ object Script extends SeerScript {
     case Message("/ncomp/blend0",f:Float) => blend0 = f
     case Message("/ncomp/blend1",f:Float) => blend1 = f
     case Message("/ncomp/blend2",f:Float) => blend2 = f
+    case Message("/treesTracker",f:Float) => if(f==1.f) treesTracker = true else treesTracker = false; println("move trees gnarl: "+treesTracker)
+    case Message("/drawAgents",f:Float) => drawAgents = f
+    case Message("/drawFabric",f:Float) => drawFabric = f
+    case Message("/camera",x:Float,y:Float,z:Float) => Camera.nav.pos.set(x,y,z); Camera.nav.quat.set(1,0,0,0)
     case Message("/gnarl/speed", f:Float) => speed = f
       cycle.speed = speed*20
       cycle2.speed = speed*20
