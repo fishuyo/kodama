@@ -9,12 +9,13 @@ uniform sampler2D u_texture1;
 
 uniform float width;
 uniform float height;
-// uniform float dt;
+uniform float dt;
 uniform float F;
 uniform float K;
 uniform vec2 brush;
+uniform float brushSize;
 
-float dt = 0.8; //0.8; //515;
+// float dt = 0.4; //0.8; //515;
 
 float dx = 1.0/width;
 float dy = 1.0/height;
@@ -117,7 +118,7 @@ void main(){
         // brsh.y = 1.0 - brsh.y;
         vec2 diff = (v_uv - brsh)/vec2(dx,dy);
         float dist = dot(diff, diff);
-        if(dist < 2000.0)
+        if(dist < brushSize) //2000.0)
             dst.g = 0.9;
     }
     

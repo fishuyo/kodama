@@ -102,12 +102,13 @@ object Script extends SeerScript {
   var texture:GdxTexture = null
   var loopNode:TextureNode = null
 
-  val quad = Plane()
-  quad.material = Material.basic
+  val quads = for(i <- 0 until 9) yield Plane()
+  quads.foreach(_.material = Material.basic)
 
   var scale = 0.5
 
   // RD
+  var rddt = 0.4f
   var (feed,kill) = (0.025f,0.06f)
   var resizeRD = false
   var rdNode:RDNode = null
@@ -125,6 +126,8 @@ object Script extends SeerScript {
     a
   }
 
+  var blue = 0.f
+  val color2 = Vec3(1,0,0)
   var (blend0,blend1) = (0.95,0.6)
   var ncompNode:RenderNode = null
   var colorizeNode:RenderNode = null
@@ -164,7 +167,11 @@ object Script extends SeerScript {
     colorizeNode.outputTo(ncompNode)
     ncompNode.outputTo(ScreenNode)
 
-    resize(560,410,710,510) // ceilingcam
+    // resize(560,410,710,510) // ceilingcam
+
+    // resize(110,10,1780,1070) // wide angle
+    resize(640, 170, 750, 680)
+
 
     SceneGraph.root.camera = new OrthographicCamera(2,2)
 
@@ -174,7 +181,7 @@ object Script extends SeerScript {
 	override def draw(){
     FPS.print
 
-    quad.draw
+    quads.foreach(_.draw)
 
     // rdNode.bindBuffer(0)
     // s.draw
@@ -235,11 +242,21 @@ object Script extends SeerScript {
     if( dirty ){  // resize everything if using sub image
       pix = new Pixmap((w*scale).toInt,(h*scale).toInt, Pixmap.Format.RGB888)
       bytes = new Array[Byte]((h.toInt*scale*w.toInt*scale*3).toInt)
-      quad.scale.set(-1.f, -1.f/*-(h/w).toFloat*/, 1.f)
       if(texture != null) texture.dispose
       texture = new GdxTexture(pix) 
-      quad.material.texture = Some(texture)
-      quad.material.textureMix = 1.f
+
+      val size = Vec3(.45f, .5f, 1.f)
+      val offset = Vec3(0.015,0,0)
+      quads.zipWithIndex.foreach { case(quad,i) =>
+        val (x,y) = (i % 3,i / 3)
+        val flip = Vec3(1.f + -2.f*(x%2), 1.f + -2.f*(y%2), 1.f)
+        val move = Vec3(x-1,y-1,0.f)*size + offset
+        quad.scale.set(size * flip)
+        quad.translate(move)
+
+        quad.material.texture = Some(texture)
+        quad.material.textureMix = 1.f
+      }
       // loopNode.texture = texture 
       dirty = false
     }
@@ -260,19 +277,27 @@ object Script extends SeerScript {
 
     Shader("rd")
     var s = Shader.shader.get
-    val bx = map(B.pos.x,-.9,.9,0,1)
-    val by = map(B.pos.z,.7,-.7,0,1)
+    var bx = map(B.pos.x,-.8,.9,.3,.7)
+    // bx = map(B.pos.x,-1.8,1.8,0,1)
+    var by = map(B.pos.z,.4,-.7,.35,.65)
+    // by = map(B.pos.z,1.5,-1.5,0,1)
     s.uniforms("brush") = Vec2(bx,by) //Mouse.xy()
-    s.uniforms("width") = Window.width.toFloat
-    s.uniforms("height") = Window.height.toFloat
+    s.uniforms("brushSize") = map(B.pos.y,0,2,2000,200) //Mouse.xy()
+    s.uniforms("width") = Window.width.toFloat //*1.5//*2.
+    s.uniforms("height") = Window.height.toFloat //*1.5//*2.
     s.uniforms("F") = feed //0.037 //62
     s.uniforms("K") = kill //0.06 //093
-    s.uniforms("dt") = dt
+    s.uniforms("dt") = rddt
 
+    if(blue == 1.f){
+      color2.lerpTo(Vec3(0,1,1),0.001)
+    } else {
+      color2.lerpTo(Vec3(1,0,0),0.001)
+    }
     Shader("colorize")
     s = Shader.shader.get
     s.uniforms("color1") = RGBA(0,0,0,0)
-    s.uniforms("color2") = RGBA(1,0,0,.3f)
+    s.uniforms("color2") = RGBA(color2, .3f) //RGBA(1,0,0,.3f)
     s.uniforms("color3") = RGBA(0,0,1,.4f)
     s.uniforms("color4") = RGBA(0,1,1,.5f)
     s.uniforms("color5") = RGBA(0,0,0,.6f)
@@ -390,8 +415,11 @@ object Script extends SeerScript {
   recv.bindp {
     case Message("/rd/fk",f:Float,k:Float) => println("update fk"); feed = f; kill = k;
     case Message("/rd/clear") => println("clear rd buffer"); resizeRD = true
+    case Message("/rd/dt", f:Float) => rddt = f
     case Message("/ncomp/blend0",f:Float) => blend0 = f
     case Message("/ncomp/blend1",f:Float) => blend1 = f
+    case Message("/rd/blue",f:Float) => blue = f
+
   }
 
 
