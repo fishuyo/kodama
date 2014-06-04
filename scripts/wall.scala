@@ -64,7 +64,7 @@ object SaveTheTrees {
 
     var map = Map[String,Any]()
     Script.trees.zipWithIndex.foreach { case(t,i) =>
-      map = map + (("t"+i) -> List(t.mx,t.my,t.mz,t.rx,t.ry,t.rz,t.visible))
+      map = map + (("t"+i) -> List(t.mx,t.my,t.mz,t.rx,t.ry,t.rz,t.visible,t.seed))
     }
 
     val p = new java.io.PrintWriter(file)
@@ -103,6 +103,7 @@ object SaveTheTrees {
       t.ry = l(4).toFloat
       t.rz = l(5).toFloat
       t.visible = l(6).toInt
+      t.seed = l(7).toLong
       t.root.pose.pos.set(t.mx,t.my,0)
       t.update(t.mz,t.rx,t.ry,t.rz)
     }
@@ -235,6 +236,8 @@ object Script extends SeerScript {
   // liquid nav
   var nav = Nav()
   nav.pos.set(0,1,1)
+
+  var wind = 0.f
 
   def loadShaders(){
     Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd_wall.frag")).monitor
@@ -376,10 +379,10 @@ object Script extends SeerScript {
 
     Shader("colorize")
     s = Shader.shader.get
-    s.uniforms("color1") = RGBA(0,0,0,0)
-    s.uniforms("color2") = RGBA(1,0,0,.3f)
+    s.uniforms("color1") = RGBA(0,0.1,.3,0)
+    s.uniforms("color2") = RGBA(0,1,1,.3f)
     s.uniforms("color3") = RGBA(0,0,1,.4f)
-    s.uniforms("color4") = RGBA(0,1,1,.5f)
+    s.uniforms("color4") = RGBA(0,1,0,.5f)
     s.uniforms("color5") = RGBA(0,0,0,.6f)
 
     Shader("ncomposite")
@@ -441,11 +444,27 @@ object Script extends SeerScript {
   }
   val acycle = Schedule.cycle(150 seconds){ case t =>
     if( drawAgents == 1.f){
-      val r = 1.f
+      val r = 2.f
       val x = r*math.cos(t*2*Pi)
       val z = r*math.sin(t*2*Pi)
       Camera.nav.pos.set(x,1,z)
       Camera.nav.quat.fromEuler(0.f,-t*2*Pi,0.f)
+    }
+  }
+
+  var gusting = false
+  var gustCycle:Schedulable = null
+  val wcycle = Schedule.every(1 seconds){
+    if(wind > 0.f && !gusting){
+      val dur = Random.float()
+      val mag = Random.float(-1.f,1.f)() * wind
+      gusting = true
+      gustCycle = Schedule.over(dur.toDouble.seconds){ case t =>
+        trees.foreach { case tree =>
+          tree.root.applyForce( Vec3(1,0,0)*mag )
+        }
+        if(t >= 1.f) gusting = false
+      }
     }
   }
 
@@ -541,7 +560,7 @@ object Script extends SeerScript {
       case _ => ()
     }
 
-    t.root.pose.pos.set(t.mx,0,-t.my)
+    t.root.pose.pos.set(t.mx,t.my,0)
 
     if(i > 2){
       t.update(t.mz,t.rx,t.ry,t.rz) 
@@ -564,6 +583,8 @@ object Script extends SeerScript {
     case Message("/treesTracker",f:Float) => if(f==1.f) treesTracker = true else treesTracker = false; println("move trees gnarl: "+treesTracker)
     case Message("/drawAgents",f:Float) => drawAgents = f
     case Message("/drawFabric",f:Float) => drawFabric = f
+    case Message("/readTrees") => SaveTheTrees.load("trees.json")
+    case Message("/wind", f:Float) => wind = f
     case Message("/camera",x:Float,y:Float,z:Float) => Camera.nav.pos.set(x,y,z); Camera.nav.quat.set(1,0,0,0)
     case Message("/gnarl/speed", f:Float) => speed = f
       cycle.speed = speed*20
