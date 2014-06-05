@@ -128,6 +128,11 @@ object Script extends SeerScript {
 
   var blue = 0.f
   val color2 = Vec3(1,0,0)
+  val color3 = Vec3(0,0,1)
+  val color4 = Vec3(0,1,1)
+  val color2d = Vec3(1,0,0)
+  val color3d = Vec3(0,0,1)
+  val color4d = Vec3(0,1,1)
   var (blend0,blend1) = (0.95,0.6)
   var ncompNode:RenderNode = null
   var colorizeNode:RenderNode = null
@@ -289,17 +294,16 @@ object Script extends SeerScript {
     s.uniforms("K") = kill //0.06 //093
     s.uniforms("dt") = rddt
 
-    if(blue == 1.f){
-      color2.lerpTo(Vec3(0,1,1),0.001)
-    } else {
-      color2.lerpTo(Vec3(1,0,0),0.001)
-    }
+    color2.lerpTo(color2d,0.001)
+    color3.lerpTo(color3d,0.001)
+    color4.lerpTo(color4d,0.001)
+
     Shader("colorize")
     s = Shader.shader.get
     s.uniforms("color1") = RGBA(0,0,0,0)
-    s.uniforms("color2") = RGBA(color2, .3f) //RGBA(1,0,0,.3f)
-    s.uniforms("color3") = RGBA(0,0,1,.4f)
-    s.uniforms("color4") = RGBA(0,1,1,.5f)
+    s.uniforms("color2") = RGBA(color2, .3f)
+    s.uniforms("color3") = RGBA(color3, .4f)
+    s.uniforms("color4") = RGBA(color4, .5f)
     s.uniforms("color5") = RGBA(0,0,0,.6f)
 
     Shader("ncomposite")
@@ -419,6 +423,9 @@ object Script extends SeerScript {
     case Message("/ncomp/blend0",f:Float) => blend0 = f
     case Message("/ncomp/blend1",f:Float) => blend1 = f
     case Message("/rd/blue",f:Float) => blue = f
+    case Message("/rd/color2",r:Float,g:Float,b:Float) => println("color2"); color2d.set(Vec3(r,g,b))
+    case Message("/rd/color3",r:Float,g:Float,b:Float) => color3d.set(Vec3(r,g,b))
+    case Message("/rd/color4",r:Float,g:Float,b:Float) => color4d.set(Vec3(r,g,b))
 
   }
 
