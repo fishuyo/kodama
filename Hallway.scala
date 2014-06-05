@@ -13,18 +13,9 @@ object Main extends SeerApp {
 
 
   override def init(){
-  	loadShaders()
-
   }
 
   override def draw(){}
   override def animate(dt:Float){}
 
-
-  def loadShaders(){
-  	var s = Shader.load("test", File("shaders/basic.vert"), File("shaders/basic.frag"))
-  	s.monitor
-  	s = Shader.load("rd", File("shaders/basic.vert"), File("shaders/rd.frag"))
-  	s.monitor
-  }
 }

@@ -179,7 +179,10 @@ object Script extends SeerScript {
   val material0 = Material.basic
   val material1 = Material.specular
   material1.color.set(0,1,1)
+  val material2 = Material.specular
+  material2.color.set(0.9,0.9,0.7)
   tree.visible = 1
+  var treeMaterial = 0.f
 
   // tree.root.position.set(0,-2,-4)
   tree.root.pose.pos.set(0,-2,-4)
@@ -296,6 +299,11 @@ object Script extends SeerScript {
       SceneGraph.root.depth = false
       Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, blend)
       TreeNode.model.material = material1
+    } else if(treeMaterial == 2){
+      Scene.alpha = .3
+      SceneGraph.root.depth = false
+      Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, blend)
+      TreeNode.model.material = material2
     } else {
       Scene.alpha = 1.
       SceneGraph.root.depth = true
@@ -364,7 +372,7 @@ object Script extends SeerScript {
     }
 
     if(resizeRD){
-      rdNode.resize(Viewport(0,0,1920,512))
+      rdNode.resize(Viewport(0,0,1600,600))
       resizeRD = false
     }
 
@@ -583,6 +591,7 @@ object Script extends SeerScript {
     case Message("/treesTracker",f:Float) => if(f==1.f) treesTracker = true else treesTracker = false; println("move trees gnarl: "+treesTracker)
     case Message("/drawAgents",f:Float) => drawAgents = f
     case Message("/drawFabric",f:Float) => drawFabric = f
+    case Message("/treeMaterial",f:Float) => treeMaterial = f
     case Message("/readTrees") => SaveTheTrees.load("trees.json")
     case Message("/wind", f:Float) => wind = f
     case Message("/camera",x:Float,y:Float,z:Float) => Camera.nav.pos.set(x,y,z); Camera.nav.quat.set(1,0,0,0)

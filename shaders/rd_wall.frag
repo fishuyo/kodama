@@ -14,10 +14,10 @@ uniform float F;
 uniform float K;
 uniform vec2 brush;
 
-float dt = 0.8; //0.8; //515;
+float dt = 1.2; //0.8; //515;
 
-float dx = 1.0/width;
-float dy = 1.0/height;
+float dx = 1.0/1600.0; //width;
+float dy = 1.0/600.0; //height;
 // float dy = 1.0/height;
 
 float da = 0.0002;
@@ -117,7 +117,7 @@ void main(){
         // brsh.y = 1.0 - brsh.y;
         vec2 diff = (v_uv - brsh)/vec2(dx,dy);
         float dist = dot(diff, diff);
-        if(dist < 100.0)
+        if(dist < 20.0)
             dst.g = 0.9;
     }
     

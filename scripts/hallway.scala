@@ -29,6 +29,9 @@ import openni._
  
 Shader.bg.set(0,0,0,1)
 
+///
+/// Trees
+///
 var idx = 0
 
 class ATree(b:Int=8) extends Tree {
@@ -38,6 +41,8 @@ class ATree(b:Int=8) extends Tree {
   setReseed(true)
   setDepth(b)
   branch(b)
+
+  def update(){ update(mz,rx,ry,rz)}
 
   override def draw(){ if(visible==1) super.draw() }
   override def animate(dt:Float){ if(visible==1) super.animate(dt) }
@@ -55,7 +60,7 @@ object SaveTheTrees {
 
     var map = Map[String,Any]()
     Script.trees.zipWithIndex.foreach { case(t,i) =>
-      map = map + (("t"+i) -> List(t.mx,t.my,t.mz,t.rx,t.ry,t.rz,t.visible))
+      map = map + (("t"+i) -> List(t.mx,t.my,t.mz,t.rx,t.ry,t.rz,t.visible,t.seed))
     }
 
     val p = new java.io.PrintWriter(file)
@@ -94,12 +99,12 @@ object SaveTheTrees {
       t.ry = l(4).toFloat
       t.rz = l(5).toFloat
       t.visible = l(6).toInt
+      t.seed = l(7).toLong
       t.root.pose.pos.set(t.mx,t.my,0)
       t.update(t.mz,t.rx,t.ry,t.rz)
     }
   }
 }
-
 
 
 object Script extends SeerScript {
