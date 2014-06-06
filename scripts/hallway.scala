@@ -208,7 +208,7 @@ object Script extends SeerScript {
       s.animate(dt)
       val w = s.vel("l_hand")
       trees.foreach{ case tree =>
-        tree.root.applyForce( w*100.f )
+        tree.root.applyForce( w*10.f )
       }
     })
 
@@ -286,7 +286,8 @@ object Script extends SeerScript {
   // }
   recv.bindp {
     case Message("/joint", name:String, id:Int, x:Float, y:Float, z:Float) =>
-      val pos = Vec3(2*x-1,1-y,z) 
+      val zz = map(z,0,7,.1,-.1)
+      val pos = Vec3(-2*x+1,1-y,zz) + Vec3(1,-.7,0)
       if(id > 9){} else{
         skeletons(id).updateJoint(name,pos)
         // if(name == "l_hand") println(skeletons(id).vel("l_hand").mag)
