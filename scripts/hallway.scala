@@ -27,6 +27,8 @@ import akka.event.Logging
 
 import de.sciss.osc.Message
 
+import concurrent.duration._
+
 import openni._
  
 Shader.bg.set(0,0,0,1)
@@ -109,6 +111,46 @@ object SaveTheTrees {
   }
 }
 
+class SkeletonBuffer(val size:Int) extends Animatable {
+  val buffer = new Array[Skeleton](size)
+  var rpos = 0
+  var len = 0
+  var wpos = 0
+  var frame = new Skeleton(0)
+
+  var playing = false
+  var recording = false
+
+  def togglePlay(){ playing = !playing }
+  def toggleRecord(){ recording = !recording }
+  def clear(){ rpos = 0; wpos = 0; len = 0 }
+  def +=(s:Skeleton){
+    if(recording){
+      val skel = new QuadMan(0)
+      skel.tracking = true
+      skel.joints = s.joints.clone
+      buffer(wpos) = skel
+      if(len < size) len += 1
+      wpos += 1
+      if( wpos >= size) wpos = 0 
+    }
+  }
+  override def draw(){
+    if(playing){
+      frame.draw
+      // println(frame.joints("head"))
+    }
+  }
+  override def animate(dt:Float){
+    if(playing && len > 0){
+      frame = buffer(rpos)
+      frame.animate(dt)
+      rpos += 1
+      if( rpos >= len) rpos = 0
+    }
+  }
+}
+
 
 object Script extends SeerScript {
 
@@ -135,6 +177,10 @@ object Script extends SeerScript {
 
   val skeletons = ArrayBuffer[Skeleton]()
   for( i <- 0 until 10) skeletons += new QuadMan(i)
+
+  val buffers = ArrayBuffer[SkeletonBuffer]()
+  for( i <- 0 until 10) buffers += new SkeletonBuffer(500)
+
 
   override def preUnload(){
     recv.clear()
@@ -186,6 +232,11 @@ object Script extends SeerScript {
       s.draw
     })
 
+    buffers.foreach( (s) => {
+      sh.uniforms("color") = RGB(0,1,1)
+      s.draw
+    })
+
     trees.foreach(_.draw)
   }
 
@@ -212,8 +263,21 @@ object Script extends SeerScript {
       }
     })
 
+    buffers.zipWithIndex.foreach{ case(b,i) =>
+      b += skeletons(i)
+      b.animate(dt)
+    }
+
     trees.foreach(_.animate(dt))
 
+  }
+
+  Schedule.clear
+  Schedule.every(1 seconds){
+    if( Random.float() < .1){
+      val i = Random.int(0,9)()
+      buffers(i).togglePlay
+    }
   }
 
   // input events
@@ -226,6 +290,8 @@ object Script extends SeerScript {
   Keyboard.bind("3", ()=>{idx=2;})
   Keyboard.bind("4", ()=>{idx=3;})
   Keyboard.bind("0", ()=>{idx= -1;})
+  Keyboard.bind("p", ()=>{buffers(1).togglePlay})
+  Keyboard.bind("o", ()=>{buffers(1).toggleRecord})
 
 
   Trackpad.clear
@@ -292,8 +358,14 @@ object Script extends SeerScript {
         skeletons(id).updateJoint(name,pos)
         // if(name == "l_hand") println(skeletons(id).vel("l_hand").mag)
         skeletons(id).tracking = true
+        buffers(id).toggleRecord
       }
-    case Message("/lost_user", id:Int) => skeletons(id).tracking = false; skeletons(id).calibrating = false;
+    case Message("/lost_user", id:Int) =>
+      if(id > 9){} else{
+        buffers(id).toggleRecord
+        skeletons(id).tracking = false;
+        skeletons(id).calibrating = false;
+      }
 
     case m => ()
   }

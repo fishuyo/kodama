@@ -83,7 +83,7 @@ class Skeleton(val id:Int) extends Animatable {
 
   var vel = joints.clone
 
-  val bones = ListBuffer[Bone]()
+  var bones = ListBuffer[Bone]()
   for( i <- (0 until 8)) bones += Bone()
 
 
