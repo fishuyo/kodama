@@ -16,18 +16,21 @@ import trees._
 // import structures._
 
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.ArrayBuffer
 import scala.collection.JavaConversions._
 
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.GL20
 
 import akka.actor._
 import akka.event.Logging
 
-import de.sciss.osc._
+import de.sciss.osc.Message
 
 import openni._
  
 Shader.bg.set(0,0,0,1)
+Camera.nav.pos.set(0,2,6)
 
 ///
 /// Trees
@@ -116,7 +119,7 @@ object Script extends SeerScript {
 
   var trees = ListBuffer[ATree]()
   trees += new ATree(9)
-  trees += new ATree(7)
+  trees += new ATree(8)
   trees += new ATree(7)
   trees += new ATree(7)
   val tree = trees(0)
@@ -125,32 +128,96 @@ object Script extends SeerScript {
   // tree.root.position.set(0,-2,-4)
   tree.root.pose.pos.set(0,-2,-4)
 
-  OpenNI.connect()
-	val context = OpenNI.context
+ //  OpenNI.connect()
+	// val context = OpenNI.context
 
-	println(OpenNI.depthMD.getFullXRes)
+	// println(OpenNI.depthMD.getFullXRes)
 
+  val skeletons = ArrayBuffer[Skeleton]()
+  for( i <- 0 until 10) skeletons += new QuadMan(i)
+
+  override def preUnload(){
+    recv.clear()
+    recv.disconnect()
+    SceneGraph.root.outputs.clear
+    ScreenNode.inputs.clear
+  }
 
 	override def onLoad(){
 	}
 
-	override def draw(){
-    FPS.print
-    trees.foreach(_.draw)
-	}
-
-	override def onUnload(){
-	}
-
-  
-  override def animate(dt:Float){
-    trees.foreach(_.animate(dt))
+  def loadShaders(){
+    Shader.load("s1", File("shaders/basic.vert"), File("shaders/skel.frag")).monitor
+    Shader.load("t", File("shaders/basic.vert"), File("shaders/tree.frag")).monitor
   }
 
+  var inited = false
+  var feedback:RenderNode = null
+  override def init(){
+    loadShaders()
+    TreeNode.model.shader = "t"
+    inited = true
+
+    SceneGraph.root.outputs.clear
+    ScreenNode.inputs.clear
+
+    feedback = new RenderNode
+    feedback.shader = "composite"
+    feedback.clear = false
+    feedback.scene.push(Plane())
+    SceneGraph.root.outputTo(feedback)
+    feedback.outputTo(feedback)
+    feedback.outputTo(ScreenNode)
+  }
+
+  override def draw(){
+    FPS.print
+
+    Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE)
+
+    Shader("s1")
+    var sh = Shader.shader.get
+    sh.uniforms("time") = t
+
+    Scene.alpha = 0.9
+    SceneGraph.root.depth = false
+    skeletons.foreach( (s) => {
+      sh.uniforms("color") = s.color
+      s.draw
+    })
+
+    trees.foreach(_.draw)
+  }
+
+  var t = 0.f
+  override def animate(dt:Float){
+
+    if(!inited) init()
+
+    // val z = skeletons(0).joints("torso").z
+    // if( z > maxz){ maxz = z; println(maxz)}
+    // beta = map(z,0.f,2.7f, 0.85, 0.9999f)
+
+    Shader("composite")
+    val fb = Shader.shader.get
+    fb.uniforms("u_blend0") = 0.25
+    fb.uniforms("u_blend1") = 0.85
+
+    t += dt
+    skeletons.foreach((s) => {
+      s.animate(dt)
+      val w = s.vel("l_hand")
+      trees.foreach{ case tree =>
+        tree.root.applyForce( w*100.f )
+      }
+    })
+
+    trees.foreach(_.animate(dt))
+
+  }
 
   // input events
   Keyboard.clear()
-  ScreenCaptureKey.use()
   Keyboard.use()
   Keyboard.bind("t", ()=>{SaveTheTrees.save("t.json")})
   Keyboard.bind("r", ()=>{SaveTheTrees.load("t.json")})
@@ -160,75 +227,77 @@ object Script extends SeerScript {
   Keyboard.bind("4", ()=>{idx=3;})
   Keyboard.bind("0", ()=>{idx= -1;})
 
-  OSC.disconnect
-  OSC.clear()
-  OSC.listen(8008)
-  OSC.bindp {
-    case Message("/test",f:Float) => println(s"test: $f")
-    case _ => ()
-  }
 
-  var B = Pose()
-  // VRPN.clear
-  // VRPN.bind("b", (p)=>{
-  //   B = B.lerp(p,0.1f)
-  //   val q = -B.quat.toZ() //toEulerVec()
-  //   // println(q)
-  //   val t = Script.tree
-  //   t.bAngle.y.setMinMax( 0.05, q.x,false )
-  //   // t.sAngle.x.setMinMax( 0.15, B.pos.x, false )
-  //   // t.bAngle.x.setMinMax( 0.15, B.pos.x, false )
-  //   // t.sAngle.z.setMinMax( 0.05, q.z, false )
-  //   // t.bAngle.z.setMinMax( 0.05, q.z, false )
+  Trackpad.clear
+  Trackpad.connect
+  Trackpad.bind( (i,f) => {
 
-  //   t.sRatio.setMinMax( 0.15, B.pos.y, false )
-  //   t.bRatio.setMinMax( 0.15, B.pos.y, false )
-
-  //   t.refresh()
-  // })
-}
-
-
-Trackpad.clear
-Trackpad.connect
-Trackpad.bind( (i,f) => {
-
-  // var t = new ATree
-  // if( idx >= 0){ 
-    val t = Script.trees(idx)
+    val t = trees(idx)
     t.visible = 1
+
+    i match {
+      case 1 =>
+        val ur = Vec3(1,0,0) //Camera.nav.ur()
+        val uf = Vec3(0,0,1) //Camera.nav.uf()
+
+        trees.foreach{ case t =>
+          t.root.applyForce( ur*(f(0)-0.5) * 2.0*f(4) )
+          t.root.applyForce( uf*(f(1)-0.5) * -2.0*f(4) )
+        }
+      case 2 =>
+        t.mx += f(2)*0.05  
+        t.my += f(3)*0.05
+      case 3 =>
+        t.ry += f(2)*0.05  
+        t.mz += f(3)*0.01
+        if (t.mz < 0.08) t.mz = 0.08
+        if (t.mz > 3.0) t.mz = 3.0 
+      case 4 =>
+        t.rz += f(3)*0.05
+        t.rx += f(2)*0.05
+      case _ => ()
+    }
+
+    t.root.pose.pos.set(t.mx,t.my,0)
+
+    if(i > 2){
+      t.update(t.mz,t.rx,t.ry,t.rz) 
+
+    }
+  })
+
+
+  val recv = new OSCRecv
+  recv.listen(7110)
+  // recv.bindp {
+  //   case Message(regex(idS,name),x:Float,y:Float,z:Float) =>
+  //     val id = idS.toInt - 1
+  //     skeletons(id).joints(name).lerpTo(Vec3(x,y,z), 0.5f)
+  //     skeletons(id).tracking = true
+  //   case Message("/calibrating", id:Int) => 
+  //     skeletons(id-1).calibrating = true
+  //   case Message("/tracking", id:Int) => 
+  //     skeletons(id-1).calibrating = false
+  //     skeletons(id-1).tracking = true
+  //   case Message("/lost", id:Int) => 
+  //     skeletons(id-1).calibrating = false
+  //     skeletons(id-1).tracking = false
+  //   case _ => ()
   // }
-
-  i match {
-    case 1 =>
-      val ur = Vec3(1,0,0) //Camera.nav.ur()
-      val uf = Vec3(0,0,1) //Camera.nav.uf()
-
-      Script.trees.foreach{ case t =>
-        t.root.applyForce( ur*(f(0)-0.5) * 2.0*f(4) )
-        t.root.applyForce( uf*(f(1)-0.5) * -2.0*f(4) )
+  recv.bindp {
+    case Message("/joint", name:String, id:Int, x:Float, y:Float, z:Float) =>
+      val pos = Vec3(2*x-1,1-y,z) 
+      if(id > 9){} else{
+        skeletons(id).updateJoint(name,pos)
+        // if(name == "l_hand") println(skeletons(id).vel("l_hand").mag)
+        skeletons(id).tracking = true
       }
-    case 2 =>
-      t.mx += f(2)*0.05  
-      t.my += f(3)*0.05
-    case 3 =>
-      t.ry += f(2)*0.05  
-      t.mz += f(3)*0.01
-      if (t.mz < 0.08) t.mz = 0.08
-      if (t.mz > 3.0) t.mz = 3.0 
-    case 4 =>
-      t.rz += f(3)*0.05
-      t.rx += f(2)*0.05
-    case _ => ()
+    case Message("/lost_user", id:Int) => skeletons(id).tracking = false; skeletons(id).calibrating = false;
+
+    case m => ()
   }
 
-  t.root.pose.pos.set(t.mx,t.my,0)
-
-  if(i > 2){
-    t.update(t.mz,t.rx,t.ry,t.rz) 
-
-  }
-})
+}
 
 
 
