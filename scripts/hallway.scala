@@ -32,7 +32,7 @@ import concurrent.duration._
 import openni._
  
 Shader.bg.set(0,0,0,1)
-Camera.nav.pos.set(0,2,6)
+Camera.nav.pos.set(0,1,4)
 
 ///
 /// Trees
@@ -176,10 +176,10 @@ object Script extends SeerScript {
 	// println(OpenNI.depthMD.getFullXRes)
 
   val skeletons = ArrayBuffer[Skeleton]()
-  for( i <- 0 until 10) skeletons += new QuadMan(i)
+  for( i <- 0 until 4) skeletons += new QuadMan(i)
 
   val buffers = ArrayBuffer[SkeletonBuffer]()
-  for( i <- 0 until 10) buffers += new SkeletonBuffer(500)
+  for( i <- 0 until 4) buffers += new SkeletonBuffer(500)
 
 
   override def preUnload(){
@@ -264,7 +264,7 @@ object Script extends SeerScript {
     })
 
     buffers.zipWithIndex.foreach{ case(b,i) =>
-      b += skeletons(i)
+      if(skeletons(i).vel("l_hand").mag > 0.) b += skeletons(i)
       b.animate(dt)
     }
 
@@ -274,8 +274,8 @@ object Script extends SeerScript {
 
   Schedule.clear
   Schedule.every(1 seconds){
-    if( Random.float() < .1){
-      val i = Random.int(0,9)()
+    if( Random.float() < .5){
+      val i = Random.int(0,3)()
       buffers(i).togglePlay
     }
   }
@@ -353,15 +353,15 @@ object Script extends SeerScript {
   recv.bindp {
     case Message("/joint", name:String, id:Int, x:Float, y:Float, z:Float) =>
       val zz = map(z,0,7,.1,-.1)
-      val pos = Vec3(-2*x+1,1-y,zz) + Vec3(1,-.7,0)
-      if(id > 9){} else{
+      val pos = Vec3(-2*x+1,1-y,zz) + Vec3(1,-1,0)
+      if(id > 3){} else{
         skeletons(id).updateJoint(name,pos)
         // if(name == "l_hand") println(skeletons(id).vel("l_hand").mag)
         skeletons(id).tracking = true
         buffers(id).toggleRecord
       }
     case Message("/lost_user", id:Int) =>
-      if(id > 9){} else{
+      if(id > 3){} else{
         buffers(id).toggleRecord
         skeletons(id).tracking = false;
         skeletons(id).calibrating = false;
