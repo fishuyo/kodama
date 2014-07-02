@@ -62,6 +62,7 @@ class Skeleton(val id:Int) extends Animatable {
   val color = RGB(1,0,0)
   var calibrating = false
   var tracking = false
+  var droppedFrames = 0
 
   var joints = Map[String,Vec3]()
 
@@ -89,11 +90,13 @@ class Skeleton(val id:Int) extends Animatable {
 
   def setJoints(s:Skeleton){
     joints = s.joints.clone
+    droppedFrames = 0
   }
 
   def updateJoint(s:String,v:Vec3){
   	vel(s) = v - joints(s)
   	joints(s) = v
+    droppedFrames = 0
   }
   def updateBones(){
 
@@ -193,6 +196,7 @@ class StickMan(override val id:Int) extends Skeleton(id) {
   }
 
   override def animate(dt:Float){
+    droppedFrames += 1
     loadingModel.rotate(0,0.10f,0)
     updateBones()
 
@@ -263,6 +267,7 @@ class QuadMan(override val id:Int) extends Skeleton(id) {
   }
 
   override def animate(dt:Float){
+    droppedFrames += 1
     updateBones()
 
     jointModels.foreach{ case(name,m) => 

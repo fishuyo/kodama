@@ -29,7 +29,7 @@ import de.sciss.osc.Message
 
 import concurrent.duration._
 
-import openni._
+// import openni._
  
 Shader.bg.set(0,0,0,1)
 Camera.nav.pos.set(0,1,4)
@@ -113,12 +113,12 @@ object SaveTheTrees {
 
 class SkeletonBuffer(val size:Int) extends Animatable {
   val buffer = new Array[Skeleton](size)
-  var rpos = 0
+  var rpos = 0.f
   var len = 0
   var wpos = 0
   var frame = new Skeleton(0)
 
-  var playing = false
+  var playing = true
   var recording = false
 
   def togglePlay(){ playing = !playing }
@@ -143,9 +143,9 @@ class SkeletonBuffer(val size:Int) extends Animatable {
   }
   override def animate(dt:Float){
     if(playing && len > 0){
-      frame = buffer(rpos)
+      frame = buffer(rpos.toInt)
       frame.animate(dt)
-      rpos += 1
+      rpos += dt
       if( rpos >= len) rpos = 0
     }
   }
@@ -228,8 +228,10 @@ object Script extends SeerScript {
     Scene.alpha = 0.9
     SceneGraph.root.depth = false
     skeletons.foreach( (s) => {
-      sh.uniforms("color") = s.color
-      s.draw
+      if(s.droppedFrames < 5){
+        sh.uniforms("color") = s.color
+        s.draw
+      }
     })
 
     buffers.foreach( (s) => {
@@ -252,9 +254,15 @@ object Script extends SeerScript {
     Shader("composite")
     val fb = Shader.shader.get
     fb.uniforms("u_blend0") = 0.25
-    fb.uniforms("u_blend1") = 0.85
+    fb.uniforms("u_blend1") = 0.88
 
     t += dt
+
+    buffers.zipWithIndex.foreach{ case(b,i) =>
+      if(skeletons(i).droppedFrames < 5 /*&& skeletons(i).vel("torso").mag > 0.*/) b += skeletons(i)
+      b.animate(0.5f)
+    }
+
     skeletons.foreach((s) => {
       s.animate(dt)
       val w = s.vel("l_hand")
@@ -263,22 +271,17 @@ object Script extends SeerScript {
       }
     })
 
-    buffers.zipWithIndex.foreach{ case(b,i) =>
-      if(skeletons(i).vel("l_hand").mag > 0.) b += skeletons(i)
-      b.animate(dt)
-    }
-
     trees.foreach(_.animate(dt))
 
   }
 
-  Schedule.clear
-  Schedule.every(1 seconds){
-    if( Random.float() < .5){
-      val i = Random.int(0,3)()
-      buffers(i).togglePlay
-    }
-  }
+  // Schedule.clear
+  // Schedule.every(1 seconds){
+  //   if( Random.float() < .5){
+  //     val i = Random.int(0,3)()
+  //     buffers(i).togglePlay
+  //   }
+  // }
 
   // input events
   Keyboard.clear()
@@ -352,8 +355,9 @@ object Script extends SeerScript {
   // }
   recv.bindp {
     case Message("/joint", name:String, id:Int, x:Float, y:Float, z:Float) =>
-      val zz = map(z,0,7,.1,-.1)
-      val pos = Vec3(-2*x+1,1-y,zz) + Vec3(1,-1,0)
+      // val zz = map(z,0,7,.1,-.1)
+      // val pos = Vec3(-2*x+1,1-y,zz) + Vec3(1,-1,0)
+      val pos = Vec3(-2*x+1,1-y,z)
       if(id > 3){} else{
         skeletons(id).updateJoint(name,pos)
         // if(name == "l_hand") println(skeletons(id).vel("l_hand").mag)

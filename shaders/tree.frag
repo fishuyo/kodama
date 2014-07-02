@@ -14,5 +14,5 @@ void main(){
     float t = 0.5*(sin(time)+1.0);
     float b = clamp(t - d + 0.3, 0.0,1.0);
     vec3 c = mix( b*color, b*color+b*vec3(0,0.25,0), 1.0-b);
-    gl_FragColor = vec4(1,1,1,1); //vec4(c,b);
+    gl_FragColor = vec4(1,1,1,0.3); //vec4(c,b);
 }
