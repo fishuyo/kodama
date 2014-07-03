@@ -13,6 +13,7 @@ object TemplateBuild extends Build {
   					SeerBuild.seer_multitouch,
   					SeerBuild.seer_eval,
   					SeerBuild.seer_kinect,
-  					SeerBuild.seer_vrpn )
+  					SeerBuild.seer_vrpn,
+  					SeerBuild.seer_video)
   
 }

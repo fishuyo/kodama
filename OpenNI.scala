@@ -21,8 +21,10 @@ object OpenNI {
 
 	var context:Context = _
 
-	var depthGen:DepthGenerator = _
-	var depthMD:DepthMetaData = _
+  var depthGen:DepthGenerator = _
+  var depthMD:DepthMetaData = _
+  var imageGen:ImageGenerator = _
+	var imageMD:ImageMetaData = _
 
 	var userGen:UserGenerator = _
 	var skeletonCap:SkeletonCapability = _
@@ -32,7 +34,7 @@ object OpenNI {
 
   import SkeletonJoint._
   
-  val colors = RGB(1,0,0) :: RGB(0,1,0) :: RGB(0,0,1) :: RGB(1,1,0) :: RGB(0,1,1) :: RGB(1,0,1) :: List()
+  val colors = RGB(1,0,0) :: RGB(0,1,0) :: RGB(0,0,1) :: RGB(1,1,0) :: RGB(0,1,1) :: RGB(1,0,1) :: RGB(1,1,1) :: List()
 
   val skeletons = HashMap[Int,StickMan]()
   for( i <- 1 to 4 ){ 
@@ -72,8 +74,11 @@ object OpenNI {
 		try{
 			context = new Context
 	 		
-	 		depthGen = DepthGenerator.create(context)
-			depthMD = depthGen.getMetaData()
+      depthGen = DepthGenerator.create(context)
+      depthMD = depthGen.getMetaData()
+
+      imageGen = ImageGenerator.create(context)
+			imageMD = imageGen.getMetaData()
 
 			userGen = UserGenerator.create(context)
 			skeletonCap = userGen.getSkeletonCapability()
@@ -131,16 +136,19 @@ object OpenNI {
     }
   }
 
-  val imgbytes = Array.fill(640*480*3)(255.toByte) //new Array[Byte](640*480*3)
+  val imgbytes = Array.fill(640*480*4)(255.toByte)
+  val rgbbytes = Array.fill(640*480*4)(255.toByte)
   def updateDepth(){
   	if( context == null) return
     try {
       context.waitNoneUpdateAll();
 
       val depthMD = depthGen.getMetaData();
+      val imageMD = imageGen.getMetaData();
       val sceneMD = userGen.getUserPixels(0);
 
       val scene = sceneMD.getData().createShortBuffer();
+      val image = imageMD.getData().createByteBuffer();
       val depth = depthMD.getData().createShortBuffer();
       calcHist(depth);
       depth.rewind();
@@ -151,9 +159,15 @@ object OpenNI {
         val pixel = depth.get();
         val user = scene.get();
             
-    		imgbytes(3*pos) = 0;
-    		imgbytes(3*pos+1) = 0;
-    		imgbytes(3*pos+2) = 0;                	
+        imgbytes(4*pos) = 0;
+        imgbytes(4*pos+1) = 0;
+        imgbytes(4*pos+2) = 0;
+        imgbytes(4*pos+3) = 0;
+
+        rgbbytes(4*pos) = image.get()
+    		rgbbytes(4*pos+1) = image.get()
+        rgbbytes(4*pos+2) = image.get()                  
+    		rgbbytes(4*pos+3) = 255.toByte                	
 
     		val drawBackground = false
         if (drawBackground || pixel != 0)
@@ -166,9 +180,10 @@ object OpenNI {
         	if (pixel != 0)
         	{
         		val histValue = histogram(pixel);
-        		imgbytes(3*pos) = (colors(c).r*histValue*255).toByte 
-        		imgbytes(3*pos+1) = (colors(c).g*histValue*255).toByte
-        		imgbytes(3*pos+2) = (colors(c).b*histValue*255).toByte
+        		imgbytes(4*pos) = (colors(c).r*histValue*255).toByte 
+        		imgbytes(4*pos+1) = (colors(c).g*histValue*255).toByte
+            imgbytes(4*pos+2) = (colors(c).b*histValue*255).toByte
+        		imgbytes(4*pos+3) = 255.toByte
         	}
         }
       }
@@ -195,9 +210,9 @@ object OpenNI {
   def getJoint(user:Int, joint:String) = {
     val jpos = skeletonCap.getSkeletonJointPosition(user, s2j(joint))
     val p = jpos.getPosition
-    val x = p.getX / 1000.f
-    val y = p.getY / 1000.f
-    val z = p.getZ / 1000.f
+    val x = -p.getX / 1000.f
+    val y = p.getY / 1000.f + 1.f
+    val z = -p.getZ / 1000.f
     val v = Vec3(x,y,z)
     skeletons(user).updateJoint(joint,v)
     (v, jpos.getConfidence )

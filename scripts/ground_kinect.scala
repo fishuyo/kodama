@@ -29,7 +29,7 @@ import java.nio.ShortBuffer
 import java.nio.ByteBuffer
 
 
-Scene.alpha = .3
+Scene.alpha = .5
 SceneGraph.root.depth = false
 
 Camera.nav.pos.set(0,1,4)
@@ -105,7 +105,7 @@ object Script extends SeerScript {
 
 	println(OpenNI.depthMD.getFullXRes)
 
-  val dpix = new Pixmap(640,480, Pixmap.Format.RGB888)
+  val dpix = new Pixmap(640,480, Pixmap.Format.RGBA8888)
   var tex1:GdxTexture = _
 
 
@@ -131,7 +131,7 @@ object Script extends SeerScript {
 
 		tex1 = new GdxTexture(dpix)
 		model.material.texture = Some(tex1)
-		model.material.textureMix = 0.f
+		model.material.textureMix = 0.3f
 
   }
 
@@ -144,7 +144,7 @@ object Script extends SeerScript {
 		model.draw
 		sun.draw
 		
-    // cursor.draw
+    cursor.draw
 
 		trees.foreach(_.draw)
 
@@ -192,25 +192,38 @@ object Script extends SeerScript {
 			case (id,b) if b =>
     		OpenNI.getJoints(id)
     		OpenNI.skeletons(id).animate(dt)
+
+        val s = OpenNI.skeletons(id)
+        val o1 = s.joints("lhand")
+        val o2 = s.joints("rhand")
+        val r1 = Ray(o1, s.bones(1).quat.toZ )
+        val r2 = Ray(o2, s.bones(3).quat.toZ )
+        fabric.particles.foreach( (p) => {
+          val t1 = r1.intersectSphere(p.position, 0.25f)
+          if(t1.isDefined){
+            p.applyForce(s.vel("lhand")*2000.f)
+            cursor.pose.pos.set(r1(t1.get))
+          }
+          val t2 = r2.intersectSphere(p.position, 0.25f)
+          if(t2.isDefined){
+            p.applyForce(s.vel("rhand")*2000.f)
+            cursor.pose.pos.set(r2(t2.get))
+          }
+        })
     	case _ => ()
   	}
 
-    val r = Ray(B.pos+Vec3(0,100,0), Vec3(0,-1,0) )
-    fabric.particles.foreach( (p) => {
-      val t = r.intersectSphere(p.position, 0.25f)
-      if(t.isDefined){
-        p.applyForce(Bvel*150.f)
-        cursor.pose.pos.set(r(t.get))
-      }
-    })
+
 
 		fabric.animate(speed.abs*1.f*dt)
 
 		trees.zipWithIndex.foreach{ case (t,i) =>
-			val v = (n*(n-i)/2).toInt //n*(n+1)/2
+			val v = (n*(n-1/*-i*/)/2).toInt //n*(n+1)/2
 			t.root.pose.pos.set(mesh.vertices(v))
-			t.root.pose.quat.set(Quat().getRotationTo(Vec3(0,0,1), mesh.normals(v)) )
-			t.root.restPose.quat.set(Quat().getRotationTo(Vec3(0,0,1), mesh.normals(v)) )
+
+      val quat = Quat().getRotationTo(Vec3(0,0,1), mesh.normals(v) * math.pow(-1,i) )
+			t.root.pose.quat.set(quat)
+			t.root.restPose.quat.set(quat)
 			t.animate(dt)
 		}
   }
@@ -230,6 +243,8 @@ object Script extends SeerScript {
   Keyboard.bind("2", ()=>{mesh.primitive = Lines})
   Keyboard.bind("3", ()=>{blend = GL20.GL_ONE_MINUS_SRC_ALPHA})
   Keyboard.bind("4", ()=>{blend = GL20.GL_ONE})
+  Keyboard.bind("r", ()=>{video.ScreenCapture.framerate = 1.f; video.ScreenCapture.start})
+  Keyboard.bind("t", ()=>{video.ScreenCapture.stop})
 
   Mouse.clear
   Mouse.use
@@ -304,6 +319,42 @@ object Script extends SeerScript {
       Script.cycle.speed = speed*20
       Script.cycle2.speed = speed*20
     case _ => ()
+  }
+
+  var imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
+  var depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
+  var screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+  
+  var cap = Schedule.every(1 second){
+    video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
+    video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
+  }
+  var scyc = Schedule.cycle(1 second){
+    case t if t >= 1.f =>
+      val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
+      video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
+    case _ => ()
+  }
+  val reset = Schedule.every(10 second){ // minute){
+    cap.cancel
+    scyc.cancel
+    video.Video.writer ! video.Close(imgwriter)
+    video.Video.writer ! video.Close(depthwriter)
+    video.Video.writer ! video.Close(screenwriter)
+    imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
+    depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
+    screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+
+    cap = Schedule.every(1 second){
+      video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
+      video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
+    }
+    scyc = Schedule.cycle(1 second){
+      case t if t >= 1.f =>
+        val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
+        video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
+      case _ => ()
+    }
   }
 
 }
