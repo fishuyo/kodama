@@ -239,19 +239,19 @@ class QuadMan(override val id:Int) extends Skeleton(id) {
   jointModels += "l_foot" -> Plane().scale(.02f)
   
   jointModels.values.foreach( (m) => {
-  	m.material = Material.basic
-  	m.material.color = color
-  	m.shader = "s1"
+    m.material = Material.basic
+    m.material.color = color
+    m.shader = "s1"
   })
 
   val boneModels = new ListBuffer[Model]()
   for( i <- (0 until 8)) boneModels += Cylinder() //Plane()
   boneModels.foreach( (b) => {
-  	b.material = Material.basic
-  	b.material.color = color
+    b.material = Material.basic
+    b.material.color = color
     b.shader = "s1"
     b.scale.set(.015f,.015f,.15f) 
-  	// b.scale.set(.5f) 
+    // b.scale.set(.5f) 
   })
 
   def setShader(s:String){
@@ -271,12 +271,12 @@ class QuadMan(override val id:Int) extends Skeleton(id) {
     updateBones()
 
     jointModels.foreach{ case(name,m) => 
-    	m.pose.pos.set( joints(name) )
+      m.pose.pos.set( joints(name) )
     }    
     boneModels.zip(bones).foreach{ case (m,b) =>
-    	m.pose.pos.set( b.pos )
-    	m.pose.quat.set( b.quat )
-    	m.scale.z = b.length
+      m.pose.pos.set( b.pos )
+      m.pose.quat.set( b.quat )
+      m.scale.z = b.length
     }
   }
 
@@ -286,4 +286,6 @@ class QuadMan(override val id:Int) extends Skeleton(id) {
     boneModels.foreach( _.material.color = color)
   }
 }
+
+
 

@@ -4,6 +4,7 @@ package openni
 
 import graphics._
 import maths._
+import util._
 
 // import scala.collection.JavaConversions._
 // import scala.collection.mutable.ArrayBuffer
@@ -36,9 +37,9 @@ object OpenNI {
   
   val colors = RGB(1,0,0) :: RGB(0,1,0) :: RGB(0,0,1) :: RGB(1,1,0) :: RGB(0,1,1) :: RGB(1,0,1) :: RGB(1,1,1) :: List()
 
-  val skeletons = HashMap[Int,StickMan]()
+  val skeletons = HashMap[Int,TriangleMan]()
   for( i <- 1 to 4 ){ 
-    skeletons(i) = new StickMan(i)
+    skeletons(i) = new TriangleMan(i)
     skeletons(i).setColor(colors(i))
   }
   // val joints = HashMap[Int,HashMap[String,Vec3]]()
@@ -226,7 +227,7 @@ class NewUserObserver extends IObserver[UserEventArgs]{
     val id = args.getId
 		println("New user " + id + " pose: " + sk.needPoseForCalibration() );
 		sk.requestSkeletonCalibration(id, true);
-    OpenNI.skeletons.getOrElseUpdate(id, new StickMan(id)).calibrating = true
+    OpenNI.skeletons.getOrElseUpdate(id, new TriangleMan(id)).calibrating = true
 	}
 }
 class LostUserObserver extends IObserver[UserEventArgs]{
@@ -234,7 +235,7 @@ class LostUserObserver extends IObserver[UserEventArgs]{
     val id = args.getId
 		println("Lost user " + id);
     OpenNI.tracking(id) = false
-    OpenNI.skeletons.getOrElseUpdate(id, new StickMan(id)).tracking = false
+    OpenNI.skeletons.getOrElseUpdate(id, new TriangleMan(id)).tracking = false
     OpenNI.skeletons(id).calibrating = false
 	}
 }
@@ -247,7 +248,7 @@ class CalibrationObserver extends IObserver[CalibrationProgressEventArgs]{
       val id = args.getUser
 			println("starting tracking "  + id);
 			OpenNI.skeletonCap.startTracking(id);
-      OpenNI.skeletons.getOrElseUpdate(id, new StickMan(id)).calibrating = false
+      OpenNI.skeletons.getOrElseUpdate(id, new TriangleMan(id)).calibrating = false
       OpenNI.skeletons(id).tracking = true
 
       OpenNI.tracking(id) = true
@@ -475,5 +476,47 @@ class QuadMan(override val id:Int) extends Skeleton(id) {
     color.set(c)
     // joints.values.foreach( _.material.color = color)
     boneModels.foreach( _.material.color = color)
+  }
+}
+
+
+class TriangleMan(override val id:Int) extends Skeleton(id) {
+
+  val mesh = new Mesh()
+  mesh.primitive = Triangles
+  mesh.maxVertices = 100
+  mesh.maxIndices = 500
+
+  val model = Model(mesh)  
+  model.material = Material.specular
+  model.material.color = color
+  // model.shader = "s1"
+
+  val indices = for( i <- 0 until 30; j <- 0 until 3) yield Random.int(0,15)().toShort
+
+  override def draw(){
+    if(tracking){ 
+      model.draw()
+    }
+  }
+
+  override def animate(dt:Float){
+    droppedFrames += 1
+    updateBones()
+
+    mesh.clear
+    // val vs = joints.values.toSeq
+    // for( i <- 0 until 9; j <- 0 until 3){
+      // mesh.vertices += Random.oneOf(vs : _*)()
+    // }
+    mesh.vertices ++= joints.values
+    mesh.indices ++= indices
+    mesh.recalculateNormals()
+    mesh.update
+  }
+
+  def setColor(c:RGBA){
+    color.set(c)
+    model.material.color.set(color)
   }
 }
