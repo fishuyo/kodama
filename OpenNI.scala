@@ -20,6 +20,7 @@ import org.openni._
 
 object OpenNI {
 
+  var connected = false
 	var context:Context = _
 
   var depthGen:DepthGenerator = _
@@ -36,6 +37,7 @@ object OpenNI {
   import SkeletonJoint._
   
   val colors = RGB(1,0,0) :: RGB(0,1,0) :: RGB(0,0,1) :: RGB(1,1,0) :: RGB(0,1,1) :: RGB(1,0,1) :: RGB(1,1,1) :: List()
+  // val colors = RGB(1,1,1) :: RGB(0.7,0.,0.1) :: RGB(0.,.7,.5) :: RGB(.5,.5,.7) :: RGB(1,1,0) :: RGB(0,1,1) :: RGB(1,0,1) :: RGB(1,1,1) :: List()
 
   val skeletons = HashMap[Int,TriangleMan]()
   for( i <- 1 to 4 ){ 
@@ -71,7 +73,8 @@ object OpenNI {
     "rfoot" -> RIGHT_FOOT
   )
 
-	def connect() = {
+	def connect(){
+    if(connected) return
 		try{
 			context = new Context
 	 		
@@ -92,6 +95,7 @@ object OpenNI {
 
 			skeletonCap.setSkeletonProfile(SkeletonProfile.ALL);
 			context.startGeneratingAll()
+      connected = true
 		} catch { case e:Exception => println(e)}
 	}
 
@@ -100,6 +104,7 @@ object OpenNI {
 		// userGen.getLostUserEvent().deleteObservers
 		// skeletonCap.getCalibrationCompleteEvent().deleteObservers
 		if(context != null) context.release
+    connected = false
 	}
 
 
@@ -490,13 +495,57 @@ class TriangleMan(override val id:Int) extends Skeleton(id) {
   val model = Model(mesh)  
   model.material = Material.specular
   model.material.color = color
-  // model.shader = "s1"
+  // model.shader = "joint"
 
+  var jointModels = Map[String,Model]()
+  jointModels += "head" -> Plane().scale(.06f,.065f,.06f)
+  jointModels += "neck" -> Plane().scale(.02f)
+  jointModels += "torso" -> Plane().scale(.08f,.08f,.08f)
+  jointModels += "rshoulder" -> Plane().scale(.02f)
+  jointModels += "relbow" -> Plane().scale(.02f)
+  jointModels += "rhand" -> Plane().scale(.02f)
+  jointModels += "lshoulder" -> Plane().scale(.02f)
+  jointModels += "lelbow" -> Plane().scale(.02f)
+  jointModels += "lhand" -> Plane().scale(.02f)
+  jointModels += "rhip" -> Plane().scale(.03f)
+  jointModels += "rknee" -> Plane().scale(.02f)
+  jointModels += "rfoot" -> Plane().scale(.02f)
+  jointModels += "lhip" -> Plane().scale(.03f)
+  jointModels += "lknee" -> Plane().scale(.02f)
+  jointModels += "lfoot" -> Plane().scale(.02f)
+
+  jointModels.values.foreach( (m) => {
+    m.material = Material.specular
+    m.material.color = color
+    m.shader = "joint"
+  })
+
+  var phase = Map[String,Float]()
+  jointModels.keys.foreach((k) => { phase(k) = 2*Pi*Random.float() })
+  
   val indices = for( i <- 0 until 30; j <- 0 until 3) yield Random.int(0,15)().toShort
 
   override def draw(){
-    if(tracking){ 
+    if(tracking){
       model.draw()
+      // jointModels.foreach{ case (k,m) => 
+      //   Shader("joint")
+      //   var sh = Shader.shader.get
+      //   sh.uniforms("phase") = phase(k)
+      //   m.draw()
+      // }
+    }
+  }
+
+  def drawJoints(){
+    if(tracking){
+      jointModels.foreach{ case (k,m) => 
+        Shader("joint")
+        var sh = Shader.shader.get
+        sh.uniforms("phase") = phase(k)
+        sh.uniforms("color") = m.material.color
+        m.draw()
+      }
     }
   }
 
@@ -504,12 +553,17 @@ class TriangleMan(override val id:Int) extends Skeleton(id) {
     droppedFrames += 1
     updateBones()
 
+    jointModels.foreach{ case(name,m) => 
+      m.pose.pos.set( joints(name) )
+    } 
+
     mesh.clear
     // val vs = joints.values.toSeq
     // for( i <- 0 until 9; j <- 0 until 3){
       // mesh.vertices += Random.oneOf(vs : _*)()
     // }
     mesh.vertices ++= joints.values
+    // mesh.texCoords ++= joints.values.map( _.xy )
     mesh.indices ++= indices
     mesh.recalculateNormals()
     mesh.update
@@ -518,5 +572,6 @@ class TriangleMan(override val id:Int) extends Skeleton(id) {
   def setColor(c:RGBA){
     color.set(c)
     model.material.color.set(color)
+    jointModels.values.foreach(_.material.color.set(color))
   }
 }
