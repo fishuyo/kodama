@@ -8,7 +8,8 @@ import dynamic._
 
 object Gallery extends SeerApp{
 
-  val live = new SeerScriptLoader("/Users/fishuyo/kodama/scripts/gallery.scala")
+	val path = "/Users/fishuyo/projects/kodama/"
+  val live = new SeerScriptLoader(path + "scripts/gallery.scala")
 
 
   override def init(){

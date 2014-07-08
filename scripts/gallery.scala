@@ -30,7 +30,7 @@ import java.nio.ByteBuffer
 
 import collection.immutable.Map
 
-Scene.alpha = .5
+Scene.alpha = .3
 SceneGraph.root.depth = false
 
 Camera.nav.pos.set(0,1,0)
@@ -43,6 +43,8 @@ class ATree(b:Int=8) extends Tree {
   setReseed(true)
   setDepth(b)
   branch(b)
+
+
 
   def update(){ update(mz,rx,ry,rz)}
 
@@ -111,22 +113,24 @@ object Script extends SeerScript {
 
 	implicit def f2i(f:Float) = f.toInt
 
-  DesktopApp.unsafeAddDir("/Users/fishuyo/kodama/lib")
+  DesktopApp.unsafeAddDir(Gallery.path + "lib")
 
   var dirty = true
   var update = false
 
-  var moving_fabric = true
+  var moving_fabric = false
   var moving_trees = true
+
+  var daytime = true
 
   val n = 30
   val mesh = Plane.generateMesh(10,10,n,n,Quat.up)
   mesh.primitive = Lines
-  val model = Model(mesh)
+  val model = Model(mesh) //.translate(0,0,-5)
   model.material = Material.specular
   model.material.color = RGB(0,0.5,0.7)
-
   mesh.vertices.foreach{ case v => v.set(v.x,v.y+Random.float(-1,1).apply()*0.05*(v.x).abs,v.z) }
+  val fabricVertices0 = mesh.vertices.clone
 
   val fabric = new SpringMesh(mesh,1.f)
   fabric.pins += AbsoluteConstraint(fabric.particles(0), fabric.particles(0).position)
@@ -135,23 +139,103 @@ object Script extends SeerScript {
   fabric.pins += AbsoluteConstraint(fabric.particles.last, fabric.particles.last.position)
   Gravity.set(0,0,0)
 
-  val sun = Sphere().scale(0.1f)
+  // var animating_fabric = true
+
+  val sun = Plane().scale(1.f)
+  sun.material = Material.basic
+  sun.shader = "sun"
+
+  val linemesh = new Mesh()
+  linemesh.primitive = Lines
+  linemesh.maxVertices = 100
+  val linemodel = Model(linemesh)
+  linemodel.shader = "bone"
 
   var blend = GL20.GL_ONE
 
   var time = 0.f
 
+  val tree = new ATree()
+  val trees = List(new ATree(8), new ATree(8))
+  var treeMinHeight = 0.1f
+
   Schedule.clear
-  val cycle = Schedule.cycle(200 seconds){ case t =>
+  val cycle = Schedule.cycle(5 minutes){ case t =>
   	val y = 10.f*math.cos(2*Pi*t)
   	val z = 10.f*math.sin(2*Pi*t)
   	Shader.lightPosition.set(Shader.lightPosition.x,y,z)
   	sun.pose.pos.set(Shader.lightPosition)
+
+    // println(s"time: $t")
+    var color = Vec3(1,1,1)
+    
+    if( t < .25f){ //noon to sunset
+      val c = map(t,0,.25,0,1)
+      color = Vec3(1,1,0).lerp(Vec3(1,0,1),c)
+    }else if(t <.5f){ // sunset to midnight
+      daytime = false
+      moving_fabric = true
+      moving_trees = false
+      val c = map(t,.25,.5,0,1)
+      color = Vec3(1,0,1).lerp(Vec3(1,1,1),c)
+    }else if( t < .75f){ // midnight to sunrise
+      val c = map(t,.5,.75,0,1)
+      color = Vec3(1,1,1).lerp(Vec3(1,0.1,0),c)
+      if( t > .65){
+        moving_fabric = false
+        moving_trees = true
+        fabric.particles.foreach( (p) => {p.applyForce((p.initialPosition - p.position)*0.75) })
+      }
+    }else if(t < 1.f){ //sunrise to noon
+      daytime = true
+      moving_fabric = false
+      moving_trees = true
+      val c = map(t,.75,1,0,1)
+      color = Vec3(1,.1,0).lerp(Vec3(1,1,0),c)
+    }
+
+    Shader.lightSpecular.set( RGBA(color*0.4,1.f) )
+
+    try{
+      Shader("sun")
+      val sh = Shader.shader.get
+      sh.uniforms("color") = color
+      // Shader.lightDiffuse.set(RGB(t,t,1-t))
+    } catch { case e:Exception => () }
+
   }
-  val cycle2 = Schedule.cycle(1 hour){ case t =>
+  val cycle2 = Schedule.cycle(15 minutes){ case t =>
   	val x = 2.f*math.cos(2*Pi*t)
   	Shader.lightPosition.x = x
   	sun.pose.pos.set(Shader.lightPosition)
+
+    if( t < .03f ){
+      val s = map (t,0,.03,0.05,0.3)
+      val h = map (t,0,.03,0.2,0.9)
+      trees.foreach( _.scale = s)
+      treeMinHeight = h
+    } else if( t < .1f ){
+      val s = map (t,.03,.1,0.3,0.5)
+      val h = map (t,.03,.1,0.9,1.5)
+      trees.foreach( _.scale = s)
+      treeMinHeight = h
+    } else if( t < 0.25f){
+      // val s = map (t,0,.1,0.05,0.5)
+      // val h = map (t,0,.1,0.2,1.5)
+      // trees.foreach( _.scale = s)
+      // treeMinHeight = h
+    } else if( t < 0.5f){
+
+    } else if( t < 0.75f){
+
+    } else if( t < 1.f){
+      if( t > 0.95){
+        val s = map(t,.95,1,0.5,0.05)
+        val h = map(t,.95,1,1.5,0.2)
+        trees.foreach( _.scale = s)
+        treeMinHeight = h
+      }
+    }
   }
 
   val joints_pulse = Schedule.cycle(4 seconds){ case t =>
@@ -161,13 +245,21 @@ object Script extends SeerScript {
       sh.uniforms("time") = t*2*Pi
     } catch { case e:Exception => ()}
   }
+
+  val sun_pulse = Schedule.cycle(8 seconds){ case t =>
+    try {
+      Shader("sun")
+      val sh = Shader.shader.get
+      sh.uniforms("time") = t*2*Pi
+    } catch { case e:Exception => ()}
+  }
   // cycle.speed = 200.f
   // cycle2.speed = 200.f
 
-  val colors = RGB(1,1,1) :: RGB(0.7,0.,0.5) :: RGB(0.,.7,.5) :: RGB(.5,.5,.7) :: RGB(0.5,.7,0) :: RGB(0,1,1) :: RGB(1,0,1) :: RGB(1,1,1) :: List()
+  val colors = Array(RGB(0.7,0.,0.5), RGB(0.,.7,.5), RGB(.5,.5,.8), RGB(0.8,.5,0.1), RGB(1,1,1) )
 
-	val cursors = HashMap[Int,(Model,Model)]()
-  for( i <- 1 to 4){
+	val cursors = new Array[(Model,Model)](4)
+  for( i <- 0 until 4){
     val m1 = Plane().scale(.1)
     val m2 = Plane().scale(.1)
     val m = Material.basic
@@ -182,12 +274,11 @@ object Script extends SeerScript {
   var lpos = Vec2()
 	var vel = Vec2()
 
+  var camDest = Vec3(0,1,0)
+
   println(com.badlogic.gdx.Gdx.graphics.getBufferFormat.samples)
 
 	// val part = fabric.particles(fabric.particles.length/2+25)
-	val tree = new ATree()
-	val trees = List(new ATree(8), new ATree(8))
-
 
   OpenNI.connect()
 	val context = OpenNI.context
@@ -197,13 +288,16 @@ object Script extends SeerScript {
   val dpix = new Pixmap(640,480, Pixmap.Format.RGBA8888)
   var tex1:GdxTexture = _
 
+  var drawconnections = false
 
   var inited = false
   var feedback:RenderNode = null
 
   def loadShaders(){
-    Shader.load("joint", File("/Users/fishuyo/kodama/shaders/basic.vert"), File("/Users/fishuyo/kodama/shaders/skel.frag")).monitor
-    Shader.load("cursor", File("/Users/fishuyo/kodama/shaders/basic.vert"), File("/Users/fishuyo/kodama/shaders/cursor.frag")).monitor
+    Shader.load("joint", File(Gallery.path + "shaders/basic.vert"), File(Gallery.path + "shaders/skel.frag")).monitor
+    Shader.load("bone", File(Gallery.path + "shaders/basic.vert"), File(Gallery.path + "shaders/bone.frag")).monitor
+    Shader.load("cursor", File(Gallery.path + "shaders/basic.vert"), File(Gallery.path + "shaders/cursor.frag")).monitor
+    Shader.load("sun", File(Gallery.path + "shaders/basic.vert"), File(Gallery.path + "shaders/sun.frag")).monitor
   }
 
   override def init(){
@@ -213,7 +307,7 @@ object Script extends SeerScript {
 
     for( i <- 1 to 4 ){ 
       OpenNI.skeletons(i) = new TriangleMan(i)
-      OpenNI.skeletons(i).setColor(colors(i))
+      OpenNI.skeletons(i).setColor(colors(i-1))
     }
 
     inited = true
@@ -247,16 +341,31 @@ object Script extends SeerScript {
 		
 		trees.foreach(_.draw)
 
+    // Gdx.gl.glLineWidth(1)
+    if(drawconnections) linemodel.draw
+
     OpenNI.skeletons.values.foreach(_.draw)
 		OpenNI.skeletons.values.foreach(_.drawJoints)
 
-    cursors.foreach{ case (id,(l,r)) => 
-      if(OpenNI.tracking.isDefinedAt(id) && OpenNI.tracking(id)){
+    if(moving_fabric){
+      val len = OpenNI.tracking.count{ case (id,b) => b }
+      for( i <- 0 until len){
         Shader("cursor")
         var sh = Shader.shader.get
-        sh.uniforms("color") = RGB(1,0,0) //l.material.color
+        val (l,r) = cursors(i)
+        sh.uniforms("color") = colors(i)
+        sh.uniforms("time") = time
         l.draw; r.draw
       }
+      // cursors.zipWithIndex.foreach{ case (l,r) => 
+      //   if(OpenNI.tracking.isDefinedAt(id) && OpenNI.tracking(id)){
+      //     Shader("cursor")
+      //     var sh = Shader.shader.get
+      //     sh.uniforms("color") = colors(id) //l.material.color
+      //     sh.uniforms("time") = time
+      //     l.draw; r.draw
+      //   }
+      // }
     }
 
 	}
@@ -278,7 +387,7 @@ object Script extends SeerScript {
     Shader("composite")
     val fb = Shader.shader.get
     fb.uniforms("u_blend0") = 0.35
-    fb.uniforms("u_blend1") = 0.65
+    fb.uniforms("u_blend1") = 0.75
   	val x = Mouse.xy().x
   	// cycle.speed = x*100
   	// cycle2.speed = x*100
@@ -299,14 +408,44 @@ object Script extends SeerScript {
 		}
 		lpos = Mouse.xy()
 
-		OpenNI.tracking.foreach { 
-			case (id,b) if b =>
+		val tracked = OpenNI.tracking.collect{ case (id,b) if b => id }.toList
+    tracked.foreach { 
+			case id =>
     		OpenNI.getJoints(id)
     		OpenNI.skeletons(id).animate(dt)
 
         val s = OpenNI.skeletons(id)
 
-        if(moving_fabric && id <= 4){
+        // if(moving_fabric && id >= 1 && id <= 4){
+        //   val o1 = s.joints("lhand")
+        //   val o2 = s.joints("rhand")
+        //   val r1 = Ray(o1, s.bones(1).quat.toZ )
+        //   val r2 = Ray(o2, s.bones(3).quat.toZ )
+        //   fabric.particles.foreach( (p) => {
+        //     val t1 = r1.intersectSphere(p.position, 0.25f)
+        //     if(t1.isDefined){
+        //       val v = s.vel("lhand")
+        //       p.applyForce(v*400.f)
+        //       cursors(id)._1.pose.pos.lerpTo(r1(t1.get),0.01)
+        //       trees.foreach( _.root.applyForce(v*20))
+        //     }
+        //     val t2 = r2.intersectSphere(p.position, 0.25f)
+        //     if(t2.isDefined){
+        //       val v = s.vel("rhand")
+        //       p.applyForce(v*400.f)
+        //       cursors(id)._2.pose.pos.lerpTo(r2(t2.get),0.01)
+        //       trees.foreach( _.root.applyForce(v*20))
+        //     }
+        //   })
+        // } 
+  	}
+
+    tracked.take(4).zipWithIndex.foreach { 
+      case (id,idx) =>
+        val s = OpenNI.skeletons(id)
+        s.setColor(colors(idx))
+
+        if(moving_fabric){
           val o1 = s.joints("lhand")
           val o2 = s.joints("rhand")
           val r1 = Ray(o1, s.bones(1).quat.toZ )
@@ -314,55 +453,179 @@ object Script extends SeerScript {
           fabric.particles.foreach( (p) => {
             val t1 = r1.intersectSphere(p.position, 0.25f)
             if(t1.isDefined){
-              p.applyForce(s.vel("lhand")*1000.f)
-              cursors(id)._1.pose.pos.lerpTo(r1(t1.get),0.01)
+              val v = s.vel("lhand")
+              p.applyForce(v*400.f)
+              cursors(idx)._1.pose.pos.lerpTo(r1(t1.get),0.01)
+              // cursors(idx)._1.material.color = colors(idx)
+              trees.foreach( _.root.applyForce(v*20))
             }
             val t2 = r2.intersectSphere(p.position, 0.25f)
             if(t2.isDefined){
-              p.applyForce(s.vel("rhand")*1000.f)
-              cursors(id)._2.pose.pos.lerpTo(r2(t2.get),0.01)
+              val v = s.vel("rhand")
+              p.applyForce(v*400.f)
+              cursors(idx)._2.pose.pos.lerpTo(r2(t2.get),0.01)
+              // cursors(idx)._2.material.color = colors(idx)
+              trees.foreach( _.root.applyForce(v*20))
             }
           })
-        }
+        } 
+    }
 
-        if(moving_trees){
+    if(moving_trees){
+      val amt = cycle2.percent + 1.f
 
-          val t = trees(0)
-          t.visible = 1
+      tracked.length match {
+        case 0 => 
+          drawconnections = false
+          trees.foreach( (t) => {
+            t.visible = 1
+            if (t.mz < treeMinHeight) t.mz = treeMinHeight
+            if (t.mz > 2.5) t.mz = 2.5 
 
-          val dist = (s.joints("rhand") - s.joints("lhand")).magSq
+            t.rz += 0.0001
 
-          t.ry = dist   
-          t.mz = (s.joints("rhand").y + s.joints("lhand").y) / 2.f
-          if (t.mz < 0.08) t.mz = 0.08
-          if (t.mz > 3.0) t.mz = 3.0 
+            t.update(t.mz,t.rx,t.ry,t.rz)
+          })
 
-          t.rz = s.joints("torso").z
-          t.rx = -s.joints("torso").x
+        case 1 =>
+          drawconnections = false
+          val s = OpenNI.skeletons(tracked(0))
 
+          animateTreesSolo(s,trees)
 
-            t.update(t.mz,t.rx,t.ry,t.rz) 
-        }
+        case 2 =>
+          val s1 = OpenNI.skeletons(tracked(0))
+          val s2 = OpenNI.skeletons(tracked(1))
+          linemesh.clear
+          s1.joints.values.zip(s1.joints.values).foreach {
+            case (j1,j2) => 
+              linemesh.vertices += j1
+              linemesh.vertices += j2
+          }
+          // val r1 = Random.oneOf(s1.joints.values.toArray :_*)
+          // val r2 = Random.oneOf(s2.joints.values.toArray :_*)
+          // for(i <- 0 until 4) { 
+          //   linemesh.vertices += r1()
+          //   linemesh.vertices += r2()
+          // }
+          linemesh.update
+          drawconnections = true
 
+          animateTreesDuet(s1,s2,trees)
 
-    	case _ => ()
-  	}
+        case 3 =>
+          val s1 = OpenNI.skeletons(tracked(0))
+          val s2 = OpenNI.skeletons(tracked(1))
+          val s3 = OpenNI.skeletons(tracked(2))
+          linemesh.clear
+          val r1 = Random.oneOf(s1.joints.values.toArray :_*)
+          val r2 = Random.oneOf(s2.joints.values.toArray :_*)
+          val r3 = Random.oneOf(s3.joints.values.toArray :_*)
+          for(i <- 0 until 4) { 
+            linemesh.vertices += r1()
+            linemesh.vertices += r2()
+            linemesh.vertices += r2()
+            linemesh.vertices += r3()
+          }
+          linemesh.update
+          drawconnections = true
 
+          animateTreesDuet(s1,s2,List(trees(1)))
+          animateTreesSolo(s3,List(trees(0)))
 
+        case count if count >= 4 =>
+          val s1 = OpenNI.skeletons(tracked(0))
+          val s2 = OpenNI.skeletons(tracked(1))
+          val s3 = OpenNI.skeletons(tracked(2))
+          val s4 = OpenNI.skeletons(tracked(3))
+          linemesh.clear
+          val r1 = Random.oneOf(s1.joints.values.toArray :_*)
+          val r2 = Random.oneOf(s2.joints.values.toArray :_*)
+          val r3 = Random.oneOf(s3.joints.values.toArray :_*)
+          val r4 = Random.oneOf(s4.joints.values.toArray :_*)
+          for(i <- 0 until 4) { 
+            linemesh.vertices += r1()
+            linemesh.vertices += r2()
+            linemesh.vertices += r2()
+            linemesh.vertices += r3()
+            linemesh.vertices += r3()
+            linemesh.vertices += r4()
+          }
+          linemesh.update
+          drawconnections = true
 
-		fabric.animate(speed.abs*1.f*dt)
+          animateTreesDuet(s1,s2,List(trees(1)))
+          animateTreesDuet(s3,s4,List(trees(0)))
+
+        case _ => drawconnections = false
+      }
+    }
+
+    fabric.animate(speed.abs*1.f*dt)
+
+    var height = 0.f
 
 		trees.zipWithIndex.foreach{ case (t,i) =>
 			val v = (n*(n-1/*-i*/)/2).toInt //n*(n+1)/2
 			t.root.pose.pos.set(mesh.vertices(v))
 
       val quat = Quat().getRotationTo(Vec3(0,0,1), mesh.normals(v) * math.pow(-1,i) )
-			t.root.pose.quat.set(quat)
+      t.root.pose.quat.slerpTo(quat, 0.01)
+			// t.root.pose.quat.set(quat)
 			t.root.restPose.quat.set(quat)
 			t.animate(dt)
+
+      if(t.visible == 1) height += t.root.getMaxAbsHeight()
 		}
+
+    // println(height)
+    camDest = Camera.nav.uf()* -(height+1) + Vec3(0,1,0)
+    Camera.nav.pos.lerpTo( camDest, 0.005 )
+
   }
 
+  def animateTreesSolo(s:TriangleMan, ts:List[ATree]){
+    val amt = cycle2.percent + 1.f
+
+    val wide = s.joints("rhand") - s.joints("lhand")
+    val dist = wide.magSq / 2.f * amt
+    val height = (s.joints("rhand").y + s.joints("lhand").y) / 2.f * amt
+    val up = s.joints("head") - s.joints("neck")
+
+    ts.foreach( (t) => {
+      t.visible = 1
+      t.ry = -.5 + dist  
+      t.mz = height
+      if (t.mz < treeMinHeight) t.mz = treeMinHeight
+      if (t.mz > 2.5) t.mz = 2.5 
+
+      t.rz = 0.3 + wide.z.abs * 4.0 * amt
+      t.rx = up.x * 4.0 * amt
+
+      t.update(t.mz,t.rx,t.ry,t.rz)
+    })
+  }
+  def animateTreesDuet(s1:TriangleMan,s2:TriangleMan, ts:List[ATree]){
+    val amt = cycle2.percent + 1.f
+
+    val wide = s1.joints("rhand") - s2.joints("lhand")
+    val dist = wide.magSq / 2.f * amt
+    val height = (s1.joints("rhand").y + s2.joints("lhand").y) / 2.f * amt
+    val up = s1.joints("head") - s2.joints("head")
+
+    ts.foreach( (t) => {
+      t.visible = 1
+      t.ry = -.6 + dist  
+      t.mz = height
+      if (t.mz < treeMinHeight) t.mz = treeMinHeight
+      if (t.mz > 2.5) t.mz = 2.5 
+
+      t.rz = 0.3 + wide.z.abs * 4.0 * amt
+      t.rx = up.y * 4.0 * amt
+
+      t.update(t.mz,t.rx,t.ry,t.rz)
+    })
+  }
 
   // input events
   Keyboard.clear()
@@ -378,8 +641,8 @@ object Script extends SeerScript {
   Keyboard.bind("2", ()=>{mesh.primitive = Lines})
   Keyboard.bind("3", ()=>{blend = GL20.GL_ONE_MINUS_SRC_ALPHA})
   Keyboard.bind("4", ()=>{blend = GL20.GL_ONE})
-  Keyboard.bind("r", ()=>{video.ScreenCapture.framerate = 1.f; video.ScreenCapture.start})
-  Keyboard.bind("t", ()=>{video.ScreenCapture.stop})
+  // Keyboard.bind("r", ()=>{video.ScreenCapture.framerate = 1.f; video.ScreenCapture.start})
+  // Keyboard.bind("t", ()=>{video.ScreenCapture.stop})
 
   Keyboard.bind("o", ()=>{SaveTheTrees.save("t.json")})
   Keyboard.bind("i", ()=>{SaveTheTrees.load("t.json")})
@@ -413,9 +676,9 @@ object Script extends SeerScript {
         t.mz += f(3)*0.01
         t.scale += f(3)*0.01
         if (t.mz < 0.8) t.mz = 0.8
-        else if (t.mz > 3.0) t.mz = 3.0 
-        if (t.scale < 0.0) t.scale = 0.0
-        else if (t.scale > 1.0) t.scale = 1.0 
+        else if (t.mz > 2.5) t.mz = 2.5 
+        if (t.scale <= 0.01) t.scale = 0.01
+        else if (t.scale > 0.5) t.scale = 0.5 
       case 4 =>
         t.rz += f(3)*0.05
         t.rx += f(2)*0.05
@@ -462,41 +725,78 @@ object Script extends SeerScript {
   //   case _ => ()
   // }
 
-  // var imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
+  var imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
   // var depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
-  // var screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+  var screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
   
-  // var cap = Schedule.every(1 second){
-  //   video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
-  //   video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
-  // }
-  // var scyc = Schedule.cycle(1 second){
-  //   case t if t >= 1.f =>
-  //     val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
-  //     video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
-  //   case _ => ()
-  // }
-  // val reset = Schedule.every(30 second){ // minute){
-  //   cap.cancel
-  //   scyc.cancel
-  //   video.Video.writer ! video.Close(imgwriter)
-  //   video.Video.writer ! video.Close(depthwriter)
-  //   video.Video.writer ! video.Close(screenwriter)
-  //   imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
-  //   depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
-  //   screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+  var cap:akka.actor.Cancellable = _
+  var scap:akka.actor.Cancellable = _
+  var capreset:akka.actor.Cancellable = _
 
-  //   cap = Schedule.every(1 second){
-  //     video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
-  //     video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
-  //   }
-  //   scyc = Schedule.cycle(1 second){
-  //     case t if t >= 1.f =>
-  //       val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
-  //       video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
-  //     case _ => ()
-  //   }
-  // }
+  Keyboard.bind("r", ()=>{
+    println("recording.")
+    cap = Schedule.every(1 second){
+      video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
+      // video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
+    }
+    scap = Schedule.cycle(1 second){
+      case t if t >= 1.f =>
+        val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
+        video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
+      case _ => ()
+    }
+    capreset = Schedule.every(30 minute){
+      cap.cancel
+      scap.cancel
+      video.Video.writer ! video.Close(imgwriter)
+      // video.Video.writer ! video.Close(depthwriter)
+      video.Video.writer ! video.Close(screenwriter)
+      imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
+      // depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
+      screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+
+      cap = Schedule.every(1 second){
+        video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
+        // video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
+      }
+      scap = Schedule.cycle(1 second){
+        case t if t >= 1.f =>
+          val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
+          video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
+        case _ => ()
+      }
+    }
+  })
+  Keyboard.bind("y", ()=>{
+    println("recording.")
+    cap = Schedule.every(1 second){
+      video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
+      // video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
+    }
+    scap = Schedule.cycle(1 second){
+      case t if t >= 1.f =>
+        val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
+        video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
+      case _ => ()
+    }
+    capreset = Schedule.after(30 minute){
+      cap.cancel
+      scap.cancel
+      video.Video.writer ! video.Close(imgwriter)
+      // video.Video.writer ! video.Close(depthwriter)
+      video.Video.writer ! video.Close(screenwriter)
+      imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
+      // depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
+      screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+    }
+  })
+  Keyboard.bind("t", ()=>{
+    println("recording cancelled.")
+    cap.cancel
+    scap.cancel
+    capreset.cancel
+  })
+  
 
 }
 

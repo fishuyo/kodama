@@ -366,5 +366,16 @@ class TreeNode extends Animatable {
     max
   }
 
+  def getMaxAbsHeight():Float = {
+    val p1 = math.abs(pose.pos.y)
+    val p2 = math.abs((pose.pos + pose.quat.toZ()*dist*scale).y)
+    var max = (if( p1 < p2) p2 else p1)
+    children.foreach( (n) => {
+      val m = n.getMaxAbsHeight
+      if(m > max) max = m
+    })
+    max
+  }
+
 }
 

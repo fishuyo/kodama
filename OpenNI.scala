@@ -254,6 +254,7 @@ class CalibrationObserver extends IObserver[CalibrationProgressEventArgs]{
 			println("starting tracking "  + id);
 			OpenNI.skeletonCap.startTracking(id);
       OpenNI.skeletons.getOrElseUpdate(id, new TriangleMan(id)).calibrating = false
+      OpenNI.skeletons(id).randomizeIndices
       OpenNI.skeletons(id).tracking = true
 
       OpenNI.tracking(id) = true
@@ -272,7 +273,7 @@ class Bone( var pos:Vec3, var quat:Quat, var length:Float)
 
 class Skeleton(val id:Int) extends Animatable {
 
-  val color = RGB(1,0,0)
+  val color = RGB(1,1,1)
   var calibrating = false
   var tracking = false
   var droppedFrames = 0
@@ -492,6 +493,16 @@ class TriangleMan(override val id:Int) extends Skeleton(id) {
   mesh.maxVertices = 100
   mesh.maxIndices = 500
 
+  val linemesh = new Mesh()
+  linemesh.primitive = Lines
+  linemesh.maxVertices = 100
+  linemesh.maxIndices = 100
+  val linemodel = Model(linemesh)
+  linemodel.shader = "bone"
+
+  val lineindices = Array[Short](13,11,11,6,6,12,12,14,11,0,0,2,2,9,6,5,11,5,0,5,5,1,5,10,1,10,1,3,3,7,10,8,8,4)
+
+
   val model = Model(mesh)  
   model.material = Material.specular
   model.material.color = color
@@ -523,11 +534,16 @@ class TriangleMan(override val id:Int) extends Skeleton(id) {
   var phase = Map[String,Float]()
   jointModels.keys.foreach((k) => { phase(k) = 2*Pi*Random.float() })
   
-  val indices = for( i <- 0 until 30; j <- 0 until 3) yield Random.int(0,15)().toShort
+  var indices = for( i <- 0 until 30; j <- 0 until 3) yield Random.int(0,15)().toShort
+
+  def randomizeIndices(){
+    indices = for( i <- 0 until 30; j <- 0 until 3) yield Random.int(0,15)().toShort 
+  }
 
   override def draw(){
     if(tracking){
       model.draw()
+      linemodel.draw()
       // jointModels.foreach{ case (k,m) => 
       //   Shader("joint")
       //   var sh = Shader.shader.get
@@ -557,6 +573,11 @@ class TriangleMan(override val id:Int) extends Skeleton(id) {
       m.pose.pos.set( joints(name) )
     } 
 
+    // val list = joints.values.toArray
+    // joints.zipWithIndex.foreach{ case((k,v),i) =>
+    //   println(s"$i $k : $v ${list(i)}")
+    // }
+
     mesh.clear
     // val vs = joints.values.toSeq
     // for( i <- 0 until 9; j <- 0 until 3){
@@ -567,6 +588,11 @@ class TriangleMan(override val id:Int) extends Skeleton(id) {
     mesh.indices ++= indices
     mesh.recalculateNormals()
     mesh.update
+
+    linemesh.clear
+    linemesh.vertices ++= mesh.vertices
+    linemesh.indices ++= lineindices
+    linemesh.update
   }
 
   def setColor(c:RGBA){
