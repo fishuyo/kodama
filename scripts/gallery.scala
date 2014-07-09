@@ -30,7 +30,7 @@ import java.nio.ByteBuffer
 
 import collection.immutable.Map
 
-Scene.alpha = .3
+Scene.alpha = .4
 SceneGraph.root.depth = false
 
 Camera.nav.pos.set(0,1,0)
@@ -43,8 +43,6 @@ class ATree(b:Int=8) extends Tree {
   setReseed(true)
   setDepth(b)
   branch(b)
-
-
 
   def update(){ update(mz,rx,ry,rz)}
 
@@ -108,6 +106,8 @@ object SaveTheTrees {
     }
   }
 }
+
+
 
 object Script extends SeerScript {
 
@@ -175,7 +175,7 @@ object Script extends SeerScript {
     }else if(t <.5f){ // sunset to midnight
       daytime = false
       moving_fabric = true
-      moving_trees = false
+      moving_trees = true
       val c = map(t,.25,.5,0,1)
       color = Vec3(1,0,1).lerp(Vec3(1,1,1),c)
     }else if( t < .75f){ // midnight to sunrise
@@ -210,12 +210,12 @@ object Script extends SeerScript {
   	sun.pose.pos.set(Shader.lightPosition)
 
     if( t < .03f ){
-      val s = map (t,0,.03,0.05,0.3)
+      val s = map (t,0,.03,0.05,0.2)
       val h = map (t,0,.03,0.2,0.9)
       trees.foreach( _.scale = s)
       treeMinHeight = h
     } else if( t < .1f ){
-      val s = map (t,.03,.1,0.3,0.5)
+      val s = map (t,.03,.1,0.2,0.5)
       val h = map (t,.03,.1,0.9,1.5)
       trees.foreach( _.scale = s)
       treeMinHeight = h
@@ -293,6 +293,9 @@ object Script extends SeerScript {
   var inited = false
   var feedback:RenderNode = null
 
+  var wind:com.badlogic.gdx.audio.Music = _
+  var volume = Vec3(0)
+
   def loadShaders(){
     Shader.load("joint", File(Gallery.path + "shaders/basic.vert"), File(Gallery.path + "shaders/skel.frag")).monitor
     Shader.load("bone", File(Gallery.path + "shaders/basic.vert"), File(Gallery.path + "shaders/bone.frag")).monitor
@@ -327,7 +330,14 @@ object Script extends SeerScript {
 		// model.material.texture = Some(tex1)
 		// model.material.textureMix = 0.3f
 
+    val f = Gdx.files.absolute(Gallery.path+"res/wind.mp3")
+    wind = Gdx.audio.newMusic(f)
+    wind.setVolume(0.0f)
+    wind.setLooping(true)
+    wind.play
+
   }
+
 
 	override def draw(){
 		FPS.print
@@ -342,7 +352,11 @@ object Script extends SeerScript {
 		trees.foreach(_.draw)
 
     // Gdx.gl.glLineWidth(1)
-    if(drawconnections) linemodel.draw
+    // if(drawconnections) linemodel.draw
+
+    // sensors.foreach( (s) => {
+    //   Sphere().scale(0.1).translate(s.position).draw()
+    // })
 
     OpenNI.skeletons.values.foreach(_.draw)
 		OpenNI.skeletons.values.foreach(_.drawJoints)
@@ -371,13 +385,16 @@ object Script extends SeerScript {
 	}
 
   override def preUnload(){
+    wind.stop
     send.disconnect
     recv.disconnect
   }
   
+  var lastdt = 0.01f
   override def animate(dt:Float){
     if(!inited) init()
 
+    lastdt = dt
     time += dt
     // val bb = dpix.getPixels
 		// bb.put(OpenNI.imgbytes)
@@ -491,77 +508,80 @@ object Script extends SeerScript {
           drawconnections = false
           val s = OpenNI.skeletons(tracked(0))
 
-          animateTreesSolo(s,trees)
+          animateTreesSoloS(s,trees,false)
 
         case 2 =>
           val s1 = OpenNI.skeletons(tracked(0))
           val s2 = OpenNI.skeletons(tracked(1))
-          linemesh.clear
-          s1.joints.values.zip(s1.joints.values).foreach {
-            case (j1,j2) => 
-              linemesh.vertices += j1
-              linemesh.vertices += j2
-          }
-          // val r1 = Random.oneOf(s1.joints.values.toArray :_*)
-          // val r2 = Random.oneOf(s2.joints.values.toArray :_*)
-          // for(i <- 0 until 4) { 
-          //   linemesh.vertices += r1()
-          //   linemesh.vertices += r2()
+          // linemesh.clear
+          // s1.joints.values.zip(s1.joints.values).foreach {
+          //   case (j1,j2) => 
+          //     linemesh.vertices += j1
+          //     linemesh.vertices += j2
           // }
-          linemesh.update
-          drawconnections = true
+          // // val r1 = Random.oneOf(s1.joints.values.toArray :_*)
+          // // val r2 = Random.oneOf(s2.joints.values.toArray :_*)
+          // // for(i <- 0 until 4) { 
+          // //   linemesh.vertices += r1()
+          // //   linemesh.vertices += r2()
+          // // }
+          // linemesh.update
+          // drawconnections = true
 
-          animateTreesDuet(s1,s2,trees)
+          animateTreesDuetS(s1,s2,trees,false)
 
         case 3 =>
           val s1 = OpenNI.skeletons(tracked(0))
           val s2 = OpenNI.skeletons(tracked(1))
           val s3 = OpenNI.skeletons(tracked(2))
-          linemesh.clear
-          val r1 = Random.oneOf(s1.joints.values.toArray :_*)
-          val r2 = Random.oneOf(s2.joints.values.toArray :_*)
-          val r3 = Random.oneOf(s3.joints.values.toArray :_*)
-          for(i <- 0 until 4) { 
-            linemesh.vertices += r1()
-            linemesh.vertices += r2()
-            linemesh.vertices += r2()
-            linemesh.vertices += r3()
-          }
-          linemesh.update
-          drawconnections = true
+          // linemesh.clear
+          // val r1 = Random.oneOf(s1.joints.values.toArray :_*)
+          // val r2 = Random.oneOf(s2.joints.values.toArray :_*)
+          // val r3 = Random.oneOf(s3.joints.values.toArray :_*)
+          // for(i <- 0 until 4) { 
+          //   linemesh.vertices += r1()
+          //   linemesh.vertices += r2()
+          //   linemesh.vertices += r2()
+          //   linemesh.vertices += r3()
+          // }
+          // linemesh.update
+          // drawconnections = true
 
-          animateTreesDuet(s1,s2,List(trees(1)))
-          animateTreesSolo(s3,List(trees(0)))
+          animateTreesDuetS(s1,s2,List(trees(1)),false)
+          animateTreesSoloS(s3,List(trees(0)),true)
 
         case count if count >= 4 =>
           val s1 = OpenNI.skeletons(tracked(0))
           val s2 = OpenNI.skeletons(tracked(1))
           val s3 = OpenNI.skeletons(tracked(2))
           val s4 = OpenNI.skeletons(tracked(3))
-          linemesh.clear
-          val r1 = Random.oneOf(s1.joints.values.toArray :_*)
-          val r2 = Random.oneOf(s2.joints.values.toArray :_*)
-          val r3 = Random.oneOf(s3.joints.values.toArray :_*)
-          val r4 = Random.oneOf(s4.joints.values.toArray :_*)
-          for(i <- 0 until 4) { 
-            linemesh.vertices += r1()
-            linemesh.vertices += r2()
-            linemesh.vertices += r2()
-            linemesh.vertices += r3()
-            linemesh.vertices += r3()
-            linemesh.vertices += r4()
-          }
-          linemesh.update
-          drawconnections = true
+          // linemesh.clear
+          // val r1 = Random.oneOf(s1.joints.values.toArray :_*)
+          // val r2 = Random.oneOf(s2.joints.values.toArray :_*)
+          // val r3 = Random.oneOf(s3.joints.values.toArray :_*)
+          // val r4 = Random.oneOf(s4.joints.values.toArray :_*)
+          // for(i <- 0 until 4) { 
+          //   linemesh.vertices += r1()
+          //   linemesh.vertices += r2()
+          //   linemesh.vertices += r2()
+          //   linemesh.vertices += r3()
+          //   linemesh.vertices += r3()
+          //   linemesh.vertices += r4()
+          // }
+          // linemesh.update
+          // drawconnections = true
 
-          animateTreesDuet(s1,s2,List(trees(1)))
-          animateTreesDuet(s3,s4,List(trees(0)))
+          animateTreesDuetS(s1,s2,List(trees(1)),false)
+          animateTreesDuetS(s3,s4,List(trees(0)),true)
 
         case _ => drawconnections = false
       }
     }
 
     fabric.animate(speed.abs*1.f*dt)
+
+    volume.lerpTo(Vec3(fabric.averageVelocity*100.f),0.01)
+    wind.setVolume(volume.x)
 
     var height = 0.f
 
@@ -605,6 +625,40 @@ object Script extends SeerScript {
       t.update(t.mz,t.rx,t.ry,t.rz)
     })
   }
+
+  def animateTreesSoloS(s:TriangleMan, ts:List[ATree], right:Boolean=false){
+
+    var off = 0
+    if(right) off = 4
+    anchors(0+off).position.lerpTo(s.joints("rhand"),0.01)
+    anchors(1+off).position.lerpTo(s.joints("lhand"),0.01)
+    anchors(2+off).position.lerpTo(s.joints("head"),0.01)
+    anchors(3+off).position.lerpTo(s.joints("neck"),0.01)
+
+    updateSensors(right)
+
+
+    val amt = cycle2.percent + 1.f
+
+    val wide = sensors(0+off).position - sensors(1+off).position //s.joints("rhand") - s.joints("lhand")
+    val dist = wide.magSq / 2.f * amt
+    val height = (sensors(0+off).position.y + sensors(1+off).position.y) / 2.f * amt
+    val up = sensors(2+off).position - sensors(3+off).position
+
+    ts.foreach( (t) => {
+      t.visible = 1
+      t.ry = wide.x * amt + amt*0.5 //+ dist
+      t.mz = height
+      if (t.mz < treeMinHeight) t.mz = treeMinHeight
+      if (t.mz > 2.5) t.mz = 2.5 
+
+      t.rz = 0.6 + wide.z.abs * 4.0 * amt
+      t.rx = up.x * 2.0 * amt
+
+      t.update(t.mz,t.rx,t.ry,t.rz)
+    })
+  }
+
   def animateTreesDuet(s1:TriangleMan,s2:TriangleMan, ts:List[ATree]){
     val amt = cycle2.percent + 1.f
 
@@ -625,6 +679,73 @@ object Script extends SeerScript {
 
       t.update(t.mz,t.rx,t.ry,t.rz)
     })
+  }
+
+  def animateTreesDuetS(s1:TriangleMan,s2:TriangleMan, ts:List[ATree], right:Boolean = false){
+
+    var off = 0
+    if(right) off = 4
+    anchors(0+off).position.lerpTo(s1.joints("rhand"),0.01)
+    anchors(1+off).position.lerpTo(s2.joints("lhand"),0.01)
+    anchors(2+off).position.lerpTo(s1.joints("head"),0.01)
+    anchors(3+off).position.lerpTo(s2.joints("head"),0.01)
+
+    updateSensors(right)
+
+    val amt = cycle2.percent + 1.f
+
+    val wide = sensors(0+off).position - sensors(1+off).position //s.joints("rhand") - s.joints("lhand")
+    val dist = wide.magSq / 2.f * amt
+    val height = (sensors(0+off).position.y + sensors(1+off).position.y) / 2.f * amt
+    val up = sensors(2+off).position - sensors(3+off).position
+
+    ts.foreach( (t) => {
+      t.visible = 1
+      t.ry = wide.x * amt  
+      t.mz = height
+      if (t.mz < treeMinHeight) t.mz = treeMinHeight
+      if (t.mz > 2.5) t.mz = 2.5 
+
+      t.rz = 0.3 + wide.z.abs * 4.0 * amt
+      t.rx = up.y * 4.0 * amt
+
+      t.update(t.mz,t.rx,t.ry,t.rz)
+    })
+  }
+
+  val sensors = Array[Particle](new Particle(),new Particle(),new Particle(), new Particle(),new Particle(),new Particle(),new Particle(), new Particle())
+  val anchors = Array[Particle](new Particle(),new Particle(),new Particle(), new Particle(),new Particle(),new Particle(),new Particle(), new Particle())
+  anchors.foreach( _.mass = 10.f)
+
+  val constraints = for(i <- 0 until 8) yield LinearSpringConstraint(sensors(i), anchors(i), 0.25, 0.7)
+  
+  var xt = 0.f
+
+  def updateSensors(right:Boolean){
+    val timeStep = .015f
+    val damping = 20.f
+    Integrators.setTimeStep(timeStep)
+
+    val steps = ( (lastdt+xt) / timeStep ).toInt
+    xt += lastdt - steps * timeStep
+
+    for( t <- (0 until steps)){
+      for( s <- (0 until 3) ){ 
+        if(!right) constraints.take(4).foreach( _.solve() )
+        else constraints.takeRight(4).foreach( _.solve() )
+      }
+
+      if(!right) sensors.take(4).foreach( (p) => {
+        p.applyGravity()
+        p.applyDamping(damping)
+        p.step() // timeStep
+      })
+      else sensors.takeRight(4).foreach( (p) => {
+        p.applyGravity()
+        p.applyDamping(damping)
+        p.step() // timeStep
+      })
+    }
   }
 
   // input events
@@ -727,7 +848,7 @@ object Script extends SeerScript {
 
   var imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
   // var depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
-  var screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+  var screenwriter:video.VideoWriter = _
   
   var cap:akka.actor.Cancellable = _
   var scap:akka.actor.Cancellable = _
@@ -735,6 +856,10 @@ object Script extends SeerScript {
 
   Keyboard.bind("r", ()=>{
     println("recording.")
+  
+    imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
+    screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+
     cap = Schedule.every(1 second){
       video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
       // video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
@@ -769,6 +894,9 @@ object Script extends SeerScript {
   })
   Keyboard.bind("y", ()=>{
     println("recording.")
+    imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
+    screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+
     cap = Schedule.every(1 second){
       video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
       // video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
