@@ -330,11 +330,11 @@ object Script extends SeerScript {
 		// model.material.texture = Some(tex1)
 		// model.material.textureMix = 0.3f
 
-    val f = Gdx.files.absolute(Gallery.path+"res/wind.mp3")
-    wind = Gdx.audio.newMusic(f)
-    wind.setVolume(0.0f)
-    wind.setLooping(true)
-    wind.play
+    // val f = Gdx.files.absolute(Gallery.path+"res/wind.mp3")
+    // wind = Gdx.audio.newMusic(f)
+    // wind.setVolume(0.0f)
+    // wind.setLooping(true)
+    // wind.play
 
   }
 
@@ -385,7 +385,7 @@ object Script extends SeerScript {
 	}
 
   override def preUnload(){
-    wind.stop
+    // wind.stop
     send.disconnect
     recv.disconnect
   }
@@ -580,8 +580,8 @@ object Script extends SeerScript {
 
     fabric.animate(speed.abs*1.f*dt)
 
-    volume.lerpTo(Vec3(fabric.averageVelocity*100.f),0.01)
-    wind.setVolume(volume.x)
+    // volume.lerpTo(Vec3(fabric.averageVelocity*100.f),0.01)
+    // wind.setVolume(volume.x)
 
     var height = 0.f
 
