@@ -123,7 +123,7 @@ object Script extends SeerScript {
 
   var daytime = true
 
-  val n = 30
+  val n = 24
   val mesh = Plane.generateMesh(10,10,n,n,Quat.up)
   mesh.primitive = Lines
   val model = Model(mesh) //.translate(0,0,-5)
@@ -156,7 +156,7 @@ object Script extends SeerScript {
   var time = 0.f
 
   val tree = new ATree()
-  val trees = List(new ATree(8), new ATree(8))
+  val trees = List(new ATree(7), new ATree(7))
   var treeMinHeight = 0.1f
 
   Schedule.clear
@@ -687,8 +687,8 @@ object Script extends SeerScript {
     if(right) off = 4
     anchors(0+off).position.lerpTo(s1.joints("rhand"),0.01)
     anchors(1+off).position.lerpTo(s2.joints("lhand"),0.01)
-    anchors(2+off).position.lerpTo(s1.joints("head"),0.01)
-    anchors(3+off).position.lerpTo(s2.joints("head"),0.01)
+    anchors(2+off).position.lerpTo(s1.joints("torso"),0.01)
+    anchors(3+off).position.lerpTo(s2.joints("torso"),0.01)
 
     updateSensors(right)
 
@@ -846,7 +846,7 @@ object Script extends SeerScript {
   //   case _ => ()
   // }
 
-  var imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
+  var imgwriter:video.VideoWriter = _ // new video.VideoWriter("", 640, 480, 1, 15)
   // var depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
   var screenwriter:video.VideoWriter = _
   
@@ -858,38 +858,38 @@ object Script extends SeerScript {
     println("recording.")
   
     imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
-    screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+    // screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
 
     cap = Schedule.every(1 second){
       video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
       // video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
     }
-    scap = Schedule.cycle(1 second){
-      case t if t >= 1.f =>
-        val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
-        video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
-      case _ => ()
-    }
-    capreset = Schedule.every(30 minute){
+    // scap = Schedule.cycle(1 second){
+      // case t if t >= 1.f =>
+        // val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
+        // video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
+      // case _ => ()
+    // }
+    capreset = Schedule.every(15 minute){
       cap.cancel
-      scap.cancel
+      // scap.cancel
       video.Video.writer ! video.Close(imgwriter)
       // video.Video.writer ! video.Close(depthwriter)
-      video.Video.writer ! video.Close(screenwriter)
+      // video.Video.writer ! video.Close(screenwriter)
       imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
       // depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
-      screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+      // screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
 
       cap = Schedule.every(1 second){
         video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
         // video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
       }
-      scap = Schedule.cycle(1 second){
-        case t if t >= 1.f =>
-          val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
-          video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
-        case _ => ()
-      }
+      // scap = Schedule.cycle(1 second){
+        // case t if t >= 1.f =>
+          // val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
+          // video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
+        // case _ => ()
+      // }
     }
   })
   Keyboard.bind("y", ()=>{
