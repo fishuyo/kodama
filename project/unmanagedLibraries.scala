@@ -35,29 +35,32 @@ object SeerLibs {
 
     // Extract jars into their respective lib folders.
     val coreDest = file("seer/seer-core/lib")
-    val deskDest = file("seer/seer-desktop/lib")
+    // val deskDest = file("seer-desktop/lib")
     val opencvDest = file("seer/seer-modules/seer-opencv/lib")
     val kinectDest = file("seer/seer-modules/seer-kinect/lib")
     val leapDest = file("seer/seer-modules/seer-leap/lib")
     val touchDest = file("seer/seer-modules/seer-multitouch/lib")
+    val vrpnDest = file("seer/seer-modules/seer-vrpn/lib")
     val nativeDest = file("lib")
     val nativeFilter =  new ExactFilter("libGlulogicMT.dylib") | new ExactFilter("libLeap.dylib") | 
                         new ExactFilter("libLeapJava.dylib") | new ExactFilter("libopencv_java245.dylib")
                       
                 
-    val coreFilter =  new ExactFilter("monido-core_2.10-0.1.2.jar") | new ExactFilter("gdx.jar")
-    val deskFilter =  new ExactFilter("gdx-natives.jar") | new ExactFilter("gdx-backend-lwjgl.jar") | new ExactFilter("gdx-backend-lwjgl-natives.jar")
+    val coreFilter =  new ExactFilter("monido-core_2.10-0.1.2.jar") //| new ExactFilter("gdx.jar")
+    //val deskFilter =  new ExactFilter("gdx-natives.jar") | new ExactFilter("gdx-backend-lwjgl.jar") | new ExactFilter("gdx-backend-lwjgl-natives.jar")
     val opencvFilter = new ExactFilter("opencv-245.jar")
     val kinectFilter = new ExactFilter("freenect-0.0.1.jar")
     val leapFilter = new ExactFilter("LeapJava.jar")
     val touchFilter = new ExactFilter("GlulogicMT.jar")
+    val vrpnFilter = new ExactFilter("vrpn.jar")
     
     IO.unzip(zipFile, coreDest, coreFilter)
-    IO.unzip(zipFile, deskDest, deskFilter)
+    //IO.unzip(zipFile, deskDest, deskFilter)
     IO.unzip(zipFile, opencvDest, opencvFilter)
     IO.unzip(zipFile, kinectDest, kinectFilter)
     IO.unzip(zipFile, leapDest, leapFilter)
     IO.unzip(zipFile, touchDest, touchFilter)
+    IO.unzip(zipFile, vrpnDest, vrpnFilter)
     IO.unzip(zipFile, nativeDest, nativeFilter)
 
     // Destroy the file.
@@ -72,7 +75,7 @@ object SeerLibs {
     
     // Declare names
     val baseUrl = "http://libgdx.badlogicgames.com/releases"
-    val gdxName = "libgdx-1.0.0"
+    val gdxName = "libgdx-1.2.0"
     // val baseUrl = "http://libgdx.badlogicgames.com/nightlies"
     // val gdxName = "libgdx-nightly-latest"
 
@@ -87,25 +90,25 @@ object SeerLibs {
     s.log.info("Extracting..")
 
     // Extract jars into their respective lib folders.
-    val commonDest = file("seer/seer-core/lib")
+    val commonDest = file("seer/seer-gdx/lib")
     val commonFilter = new ExactFilter("gdx.jar")
     IO.unzip(zipFile, commonDest, commonFilter)
 
-    val desktopDest = file("seer/seer-desktop/lib")
+    val desktopDest = file("seer/seer-gdx/seer-gdx-desktop-app/lib")
     val desktopFilter = new ExactFilter("gdx-natives.jar") |
     new ExactFilter("gdx-backend-lwjgl.jar") |
-    new ExactFilter("gdx-backend-lwjgl-natives.jar") |
-    new ExactFilter("gdx-tools.jar")
+    new ExactFilter("gdx-backend-lwjgl-natives.jar") //|
+    // new ExactFilter("gdx-tools.jar")
     IO.unzip(zipFile, desktopDest, desktopFilter)
 
-    val androidDest = file("seer/apps/android/loop/src/main/libs")
-    val androidFilter = new ExactFilter("gdx-backend-android.jar") |
-    new ExactFilter("armeabi/libgdx.so") |
-    new ExactFilter("armeabi/libandroidgl20.so") |
-    new ExactFilter("armeabi-v7a/libgdx.so") |
-    new ExactFilter("armeabi-v7a/libandroidgl20.so") |
-    commonFilter
-    IO.unzip(zipFile, androidDest, androidFilter)
+    // val androidDest = file("apps/android/loop/src/main/libs")
+    // val androidFilter = new ExactFilter("gdx-backend-android.jar") |
+    // new ExactFilter("armeabi/libgdx.so") |
+    // new ExactFilter("armeabi/libandroidgl20.so") |
+    // new ExactFilter("armeabi-v7a/libgdx.so") |
+    // new ExactFilter("armeabi-v7a/libandroidgl20.so") |
+    // commonFilter
+    // IO.unzip(zipFile, androidDest, androidFilter)
     //check this copy?
     //IO.copyFile( (androidDest+"gdx-backend-android.jar").asFile , "android/lib/".asFile )
 

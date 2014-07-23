@@ -2,7 +2,6 @@
 package com.fishuyo.seer
 package kodama
 
-import maths._
 import graphics._
 import spatial._
 import util._

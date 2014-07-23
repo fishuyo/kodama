@@ -42,24 +42,34 @@ object SeerProject {
 
 object SeerBuild extends Build {
 
+
   // core
   lazy val seer_core = SeerProject (
     id = "seer-core",
     base = file("seer/seer-core")
   )
 
-  lazy val seer_desktop = SeerProject (
-    id = "seer-desktop",
-    base = file("seer/seer-desktop")
-  ) dependsOn ( seer_core, seer_repl )
+  lazy val seer_gdx = SeerProject (
+    id = "seer-gdx",
+    base = file("seer/seer-gdx")
+  ) dependsOn seer_core
+
+  lazy val seer_gdx_desktop_app = SeerProject (
+    id = "seer-gdx-desktop-app",
+    base = file("seer/seer-gdx/seer-gdx-desktop-app")
+  ) dependsOn (seer_gdx, seer_repl, seer_script)
 
 
-  // modules
-  lazy val seer_allosphere = SeerProject (
-    id = "seer-allosphere",
-    base = file("seer/seer-modules/seer-allosphere")
-  ) dependsOn ( seer_desktop, seer_luaj )
 
+  // examples
+  lazy val examples = Project (
+    "examples",
+    file("seer/examples"),
+    settings = BuildSettings.app
+  ) dependsOn( seer_gdx_desktop_app, seer_jruby, seer_portaudio  )
+
+
+    // interaction
   lazy val seer_kinect = SeerProject (
     "seer-kinect",
     file("seer/seer-modules/seer-kinect")
@@ -75,6 +85,13 @@ object SeerBuild extends Build {
     file("seer/seer-modules/seer-multitouch")
   ) dependsOn seer_core
 
+  lazy val seer_vrpn = SeerProject ( // TODO get vrpn dependency..
+    "seer-vrpn",
+    file("seer/seer-modules/seer-vrpn")
+  ) dependsOn seer_core
+
+
+  // image video computer vision
   lazy val seer_opencv = SeerProject (
     "seer-opencv",
     file("seer/seer-modules/seer-opencv")
@@ -83,50 +100,45 @@ object SeerBuild extends Build {
   lazy val seer_video = SeerProject (
     "seer-video",
     file("seer/seer-modules/seer-video")
-  ) dependsOn seer_core 
+  ) dependsOn seer_gdx 
 
+
+  // audio
   lazy val seer_portaudio = SeerProject (
     "seer-portaudio",
     file("seer/seer-modules/seer-portaudio")
   ) dependsOn seer_core
 
-  lazy val seer_vrpn = SeerProject ( // TODO get vrpn dependency..
-    "seer-vrpn",
-    file("seer/seer-modules/seer-vrpn")
-  ) dependsOn seer_core
 
+  // dynamic and livecoding related
   lazy val seer_jruby = SeerProject (
     "seer-jruby",
     file("seer/seer-modules/seer-dynamic/seer-jruby")
   ) dependsOn seer_core
+
   lazy val seer_luaj = SeerProject (
     "seer-luaj",
     file("seer/seer-modules/seer-dynamic/seer-luaj")
   ) dependsOn seer_core
-  lazy val seer_eval = SeerProject (
+
+  lazy val seer_script = SeerProject (
     "seer-eval",
     file("seer/seer-modules/seer-dynamic/seer-eval")
-  ) dependsOn seer_core
+  ) dependsOn( seer_core )
+
   lazy val seer_repl = SeerProject (
     "seer-repl",
     file("seer/seer-modules/seer-dynamic/seer-repl")
   ) dependsOn seer_core 
 
 
-  // examples
-  lazy val examples = Project (
-    "examples",
-    file("seer/examples"),
+  // allosphere related
+  lazy val seer_allosphere = SeerProject (
+    id = "seer-allosphere",
+    base = file("seer/seer-modules/seer-allosphere"),
     settings = BuildSettings.app
-  ) dependsOn( seer_desktop, seer_opencv )
-
-
-  // experiments
-  lazy val experiments = SeerProject(
-    id = "experiments",
-    base = file("seer/experiments"),
-    settings = BuildSettings.app
-  ) dependsOn( seer_desktop, seer_opencv, seer_allosphere, seer_portaudio, seer_kinect, seer_luaj, seer_vrpn, seer_eval, seer_jruby, seer_multitouch )
+  ) dependsOn ( seer_gdx_desktop_app, seer_luaj, seer_script )
 
 }
+
 

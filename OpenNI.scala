@@ -3,7 +3,7 @@ package com.fishuyo.seer
 package openni
 
 import graphics._
-import maths._
+import spatial._
 import util._
 
 // import scala.collection.JavaConversions._
