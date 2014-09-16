@@ -2,14 +2,13 @@
 import com.fishuyo.seer._
 import graphics._
 import dynamic._
-import maths._
 import spatial._
 import io._
 import cv._
 import video._
 import util._
-import kinect._
-import actor._
+// import kinect._
+import kodama.actor.ActorManager.{system_floor => system}
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConversions._
@@ -274,7 +273,7 @@ object Script extends SeerScript {
     }
 
     if( remote == null){
-      remote = system.actorFor("akka://seer@192.168.0.101:2552/user/puddle")
+      remote = system.actorFor("akka.udp://seer@192.168.0.101:2552/user/puddle")
       if(remote != null) remote ! ((w*scale).toInt,(h*scale).toInt)
     }
 
@@ -442,7 +441,7 @@ object Script extends SeerScript {
       case "request" => 
         println("resize requested")
         // if( remote == null){
-        val remote = system.actorFor("akka://seer@192.168.0.101:2552/user/puddle")
+        val remote = system.actorFor("akka.udp://seer@192.168.0.101:2552/user/puddle")
         // }
         if(remote != null) remote ! ((w*scale).toInt,(h*scale).toInt)
 

@@ -2,11 +2,10 @@
 import com.fishuyo.seer._
 import graphics._
 import dynamic._
-import maths._
 import spatial._
 import io._
 import util._
-import actor._
+import kodama.actor.ActorManager.{ system_wall => system }
 
 import trees._
 import particle._
@@ -283,7 +282,7 @@ object Script extends SeerScript {
     colorizeNode.outputTo(ncompNode)
     // ncompNode.outputTo(ScreenNode)
 
-    val request = system.actorFor("akka://seer@192.168.0.109:2552/user/resize")
+    val request = system.actorFor("akka.udp://seer@192.168.0.109:2552/user/resize")
     if( request != null ){
       println("requesting resize")
       request ! "request"
