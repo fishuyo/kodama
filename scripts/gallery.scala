@@ -159,7 +159,7 @@ object Script extends SeerScript {
   var treeMinHeight = 0.1f
 
   Schedule.clear
-  val cycle = Schedule.cycle(5 minutes){ case t =>
+  val cycle = Schedule.cycle(2 minutes){ case t =>
   	val y = 10.f*math.cos(2*Pi*t)
   	val z = 10.f*math.sin(2*Pi*t)
   	Shader.lightPosition.set(Shader.lightPosition.x,y,z)
@@ -174,7 +174,7 @@ object Script extends SeerScript {
     }else if(t <.5f){ // sunset to midnight
       daytime = false
       moving_fabric = true
-      moving_trees = true
+      moving_trees = false
       val c = map(t,.25,.5,0,1)
       color = Vec3(1,0,1).lerp(Vec3(1,1,1),c)
     }else if( t < .75f){ // midnight to sunrise
@@ -182,7 +182,7 @@ object Script extends SeerScript {
       color = Vec3(1,1,1).lerp(Vec3(1,0.1,0),c)
       if( t > .65){
         moving_fabric = false
-        moving_trees = true
+        moving_trees = false
         fabric.particles.foreach( (p) => {p.applyForce((p.initialPosition - p.position)*0.75) })
       }
     }else if(t < 1.f){ //sunrise to noon
@@ -353,9 +353,12 @@ object Script extends SeerScript {
     // Gdx.gl.glLineWidth(1)
     // if(drawconnections) linemodel.draw
 
-    // sensors.foreach( (s) => {
-    //   Sphere().scale(0.1).translate(s.position).draw()
-    // })
+    sensors.foreach( (s) => {
+      val m = Sphere().scale(0.035).translate(s.position)
+      m.material = Material.specular
+      m.material.color = RGBA(1,1,1,0.5)
+      m.draw()
+    })
 
     OpenNI.skeletons.values.foreach(_.draw)
 		OpenNI.skeletons.values.foreach(_.drawJoints)
@@ -598,8 +601,8 @@ object Script extends SeerScript {
 		}
 
     // println(height)
-    camDest = Camera.nav.uf()* -(height+1) + Vec3(0,1,0)
-    Camera.nav.pos.lerpTo( camDest, 0.005 )
+    camDest = Camera.nav.uf()* -(height*0.5+1) + Vec3(0,1,0)
+    Camera.nav.pos.lerpTo( camDest, 0.001 )
 
   }
 
@@ -646,7 +649,7 @@ object Script extends SeerScript {
 
     ts.foreach( (t) => {
       t.visible = 1
-      t.ry = wide.x * amt + amt*0.5 //+ dist
+      t.ry = dist + 0.5 //amt*0.5 //+ dist
       t.mz = height
       if (t.mz < treeMinHeight) t.mz = treeMinHeight
       if (t.mz > 2.5) t.mz = 2.5 
@@ -716,7 +719,7 @@ object Script extends SeerScript {
   val anchors = Array[Particle](new Particle(),new Particle(),new Particle(), new Particle(),new Particle(),new Particle(),new Particle(), new Particle())
   anchors.foreach( _.mass = 10.f)
 
-  val constraints = for(i <- 0 until 8) yield LinearSpringConstraint(sensors(i), anchors(i), 0.25, 0.7)
+  val constraints = for(i <- 0 until 8) yield LinearSpringConstraint(sensors(i), anchors(i), 0.1, 0.7)
   
   var xt = 0.f
 
@@ -857,38 +860,38 @@ object Script extends SeerScript {
     println("recording.")
   
     imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
-    // screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+    screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
 
     cap = Schedule.every(1 second){
       video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
       // video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
     }
-    // scap = Schedule.cycle(1 second){
-      // case t if t >= 1.f =>
-        // val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
-        // video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
-      // case _ => ()
-    // }
-    capreset = Schedule.every(15 minute){
+    scap = Schedule.cycle(1 second){
+      case t if t >= 1.f =>
+        val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
+        video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
+      case _ => ()
+    }
+    capreset = Schedule.every(2 minute){
       cap.cancel
-      // scap.cancel
+      scap.cancel
       video.Video.writer ! video.Close(imgwriter)
       // video.Video.writer ! video.Close(depthwriter)
-      // video.Video.writer ! video.Close(screenwriter)
+      video.Video.writer ! video.Close(screenwriter)
       imgwriter = new video.VideoWriter("", 640, 480, 1, 15)
       // depthwriter = new video.VideoWriter("", 640, 480, 1, 15)
-      // screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
+      screenwriter = new video.VideoWriter("", Window.width, Window.height, 1, 15)
 
       cap = Schedule.every(1 second){
         video.Video.writer ! video.Bytes(imgwriter,OpenNI.rgbbytes,640,480)
         // video.Video.writer ! video.Bytes(depthwriter,OpenNI.imgbytes,640,480)
       }
-      // scap = Schedule.cycle(1 second){
-        // case t if t >= 1.f =>
-          // val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
-          // video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
-        // case _ => ()
-      // }
+      scap = Schedule.cycle(1 second){
+        case t if t >= 1.f =>
+          val bytes = com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(true)
+          video.Video.writer ! video.Bytes(screenwriter,bytes,Window.width,Window.height)
+        case _ => ()
+      }
     }
   })
   Keyboard.bind("y", ()=>{

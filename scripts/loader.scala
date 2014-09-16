@@ -10,13 +10,13 @@ object Loader extends SeerScript {
 	// loaders += new SeerScriptLoader("scripts/ground.scala")
 	// loaders += new SeerScriptLoader("scripts/ground_kinect.scala")
 	// loaders += new SeerScriptLoader("scripts/rd.scala")
-	// loaders += new SeerScriptLoader("scripts/rd_kinect.scala")
+	loaders += new SeerScriptLoader("scripts/rd_kinect.scala")
 	// loaders += new SeerScriptLoader("scripts/dla.scala")
 	// loaders += new SeerScriptLoader("scripts/dla_kinect.scala")
 	// loaders += new SeerScriptLoader("scripts/kinecttest.scala")
 	// loaders += new SeerScriptLoader("scripts/opennitest.scala")
 	// loaders += new SeerScriptLoader("scripts/floor.scala")
-	loaders += new SeerScriptLoader("scripts/test.scala")
+	// loaders += new SeerScriptLoader("scripts/test.scala")
 
 
 	override def onUnload(){

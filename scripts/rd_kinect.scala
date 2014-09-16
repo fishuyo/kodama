@@ -4,7 +4,6 @@ import com.fishuyo.seer._
 import kodama._
 import graphics._
 import spatial._
-import maths._
 import dynamic._
 import io._
 import util._
@@ -47,8 +46,8 @@ object Script extends SeerScript {
 
 	val quad1 = Plane().scale(1,-480.f/640.f,1).translate(-1.5,0,0)
 	val quad2 = Plane().scale(1,-480.f/640.f,1).translate(1,0,0)
-  val dpix = new Pixmap(640,480, Pixmap.Format.RGB888)
-  val vpix = new Pixmap(640,480, Pixmap.Format.RGB888)
+  val dpix = new Pixmap(640,480, Pixmap.Format.RGBA8888)
+  val vpix = new Pixmap(640,480, Pixmap.Format.RGBA8888)
   var tex1:GdxTexture = _
   var tex2:GdxTexture = _
 
@@ -104,10 +103,12 @@ object Script extends SeerScript {
     s.uniforms("color4") = RGBA(0,1,1,.5f)
     s.uniforms("color5") = RGBA(0,0,0,.6f)
 
+    try{
   	val bb = dpix.getPixels
 		bb.put(OpenNI.imgbytes)
 		bb.rewind
 		tex1.draw(dpix,0,0)
+		} catch { case e:Exception => ()}
 	}
 
 	def loadShaders(){
