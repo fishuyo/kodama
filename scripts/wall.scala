@@ -1,13 +1,13 @@
 
 import com.fishuyo.seer._
+import kodama._
 import graphics._
 import dynamic._
 import spatial._
 import io._
 import util._
 import kodama.actor.ActorManager.{ system_wall => system }
-
-import trees._
+// import trees._
 import particle._
 
 import scala.collection.mutable.ListBuffer
@@ -31,6 +31,7 @@ Camera.nav.quat.set(1,0,0,0)
 
 Shader.bg.set(0,0,0,1)
 
+System.setProperty("java.net.preferIPv4Stack" , "true");
 
 ///
 /// Trees
@@ -332,7 +333,7 @@ object Script extends SeerScript {
     receiver ! akka.actor.PoisonPill
     ScreenNode.inputs.clear
     SceneGraph.root.outputs.clear
-    send.disconnect
+    // send.disconnect
     recv.disconnect
   }
 
@@ -501,6 +502,10 @@ object Script extends SeerScript {
 
   var treesTracker = false
   var G = Pose()
+  var A = Pose()
+  var B = Pose()
+  var Blast = Pose()
+  var Bvel = Vec3()
   VRPN.clear
   VRPN.bind("gnarl", (p)=>{
     G = G.lerp(p,0.1f)
@@ -517,16 +522,13 @@ object Script extends SeerScript {
     }
   })
 
-  var A = Pose()
   VRPN.bind("a", (p)=>{
     A = A.lerp(p,0.1f)
     nav.vel.set(0,0,A.pos.z* -0.3)
     nav.angVel.set((A.pos.y-1)*0.3,A.pos.x* -0.3,0)
   })
 
-  var B = Pose()
-  var Blast = Pose()
-  var Bvel = Vec3()
+
   VRPN.bind("b", (p)=>{
     Blast = B
     B = B.lerp(p,0.1f)
@@ -536,7 +538,7 @@ object Script extends SeerScript {
 
   Trackpad.clear
   Trackpad.connect
-  Trackpad.bind( (i,f) => {
+  Trackpad.bind( (touch) => {
 
     // var t = new ATree
     // if( idx >= 0){ 
@@ -544,32 +546,34 @@ object Script extends SeerScript {
       t.visible = 1
     // }
 
-    i match {
+    val p = touch.pos
+    val v = touch.vel
+    touch.count match {
       case 1 =>
         val ur = Vec3(1,0,0) //Camera.nav.ur()
         val uf = Vec3(0,0,1) //Camera.nav.uf()
 
         trees.foreach{ case t =>
-          t.root.applyForce( ur*(f(0)-0.5) * 2.0*f(4) )
-          t.root.applyForce( uf*(f(1)-0.5) * -2.0*f(4) )
+          t.root.applyForce( ur*(p.x-0.5) * 2.0*touch.size )
+          t.root.applyForce( uf*(p.y-0.5) * -2.0*touch.size )
         }
       case 2 =>
-        t.mx += f(2)*0.05  
-        t.my += f(3)*0.05
+        t.mx += v.x*0.05  
+        t.my += v.y*0.05
       case 3 =>
-        t.ry += f(2)*0.05  
-        t.mz += f(3)*0.01
+        t.ry += v.x*0.05  
+        t.mz += v.y*0.01
         if (t.mz < 0.08) t.mz = 0.08
         if (t.mz > 3.0) t.mz = 3.0 
       case 4 =>
-        t.rz += f(3)*0.05
-        t.rx += f(2)*0.05
+        t.rz += v.y*0.05
+        t.rx += v.x*0.05
       case _ => ()
     }
 
     t.root.pose.pos.set(t.mx,t.my,0)
 
-    if(i > 2){
+    if(touch.count > 2){
       t.update(t.mz,t.rx,t.ry,t.rz) 
 
     }
@@ -577,8 +581,8 @@ object Script extends SeerScript {
 
 
   // OSC
-  val send = new OSCSend
-  send.connect("localhost", 8010)
+  // val send = new OSCSend
+  // send.connect("localhost", 8010)
   val recv = new OSCRecv
   recv.listen(8011)
   recv.bindp {
