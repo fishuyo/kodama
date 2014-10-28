@@ -19,13 +19,13 @@ object ActorManager {
         provider = "akka.remote.RemoteActorRefProvider"
       }
       remote {
-        enabled-transports = ["akka.remote.netty.udp"]
-        netty.udp {
-          send-buffer-size = 20MiB
-          receive-buffer-size = 20MiB
-          maximum-frame-size = 10MiB
+        enabled-transports = ["akka.remote.netty.tcp"]
+        netty.tcp {
+          send-buffer-size = 200MiB
+          receive-buffer-size = 200MiB
+          maximum-frame-size = 100MiB
 
-          hostname = "192.168.0.109"
+          hostname = "localhost"
           port = 2552
         }
         compression-scheme = "zlib"
@@ -40,14 +40,14 @@ object ActorManager {
         provider = "akka.remote.RemoteActorRefProvider"
       }
       remote {
-        enabled-transports = ["akka.remote.netty.udp"]
-        netty.udp {
-          send-buffer-size = 20MiB
-          receive-buffer-size = 20MiB
-          maximum-frame-size = 10MiB
+        enabled-transports = ["akka.remote.netty.tcp"]
+        netty.tcp {
+          send-buffer-size = 200MiB
+          receive-buffer-size = 200MiB
+          maximum-frame-size = 100MiB
           
-          hostname = "192.168.0.101"
-          port = 2552
+          hostname = "localhost"
+          port = 2553
         }
         compression-scheme = "zlib"
         zlib-compression-level = 1

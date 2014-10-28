@@ -6,6 +6,7 @@ import dynamic._
 import spatial._
 import io._
 import util._
+// import actor._
 import kodama.actor.ActorManager.{ system_wall => system }
 // import trees._
 import particle._
@@ -283,7 +284,7 @@ object Script extends SeerScript {
     colorizeNode.outputTo(ncompNode)
     // ncompNode.outputTo(ScreenNode)
 
-    val request = system.actorFor("akka.udp://seer@192.168.0.109:2552/user/resize")
+    val request = system.actorFor("akka.tcp://seer@localhost:2552/user/resize")
     if( request != null ){
       println("requesting resize")
       request ! "request"
@@ -365,6 +366,7 @@ object Script extends SeerScript {
         bb.rewind()
       } catch { case e:Exception => "Error updating: probably size mismatch!"}
 
+      println("update")
       // update texture from pixmap
       texture.draw(pix,0,0)
       update = false
@@ -584,7 +586,7 @@ object Script extends SeerScript {
   // val send = new OSCSend
   // send.connect("localhost", 8010)
   val recv = new OSCRecv
-  recv.listen(8011)
+  recv.listen(8012)
   recv.bindp {
     case Message("/rd/fk",f:Float,k:Float) => println("update fk"); feed = f; kill = k;
     case Message("/rd/clear") => println("clear rd"); resizeRD = true

@@ -9,6 +9,7 @@ import video._
 import util._
 // import kinect._
 import kodama.actor.ActorManager.{system_floor => system}
+// import actor._
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConversions._
@@ -85,7 +86,7 @@ object Script extends SeerScript {
 	var (w,ww,h,hh) = (0.0,0.0,0.0,0.0)
 
 
-  val capture = new VideoCapture(0)
+  val capture = new VideoCapture(1)
   Thread.sleep(250)
 
   w = capture.get(Highgui.CV_CAP_PROP_FRAME_WIDTH)
@@ -273,7 +274,7 @@ object Script extends SeerScript {
     }
 
     if( remote == null){
-      remote = system.actorFor("akka.udp://seer@192.168.0.101:2552/user/puddle")
+      remote = system.actorFor("akka.tcp://seer@localhost:2553/user/puddle")
       if(remote != null) remote ! ((w*scale).toInt,(h*scale).toInt)
     }
 
@@ -348,7 +349,10 @@ object Script extends SeerScript {
 		bb.put(bytes)
 		bb.rewind()
 
-    if(remote != null) remote ! bytes
+    if(remote != null){
+      remote ! bytes
+      println("sent bytes")
+    }
 
     // update texture from pixmap
 		texture.draw(pix,0,0)
@@ -440,9 +444,9 @@ object Script extends SeerScript {
     def receive = {
       case "request" => 
         println("resize requested")
-        // if( remote == null){
-        val remote = system.actorFor("akka.udp://seer@192.168.0.101:2552/user/puddle")
-        // }
+        if( remote == null){
+        val remote = system.actorFor("akka.tcp://seer@localhost:2553/user/puddle")
+        }
         if(remote != null) remote ! ((w*scale).toInt,(h*scale).toInt)
 
       case _ => ()
